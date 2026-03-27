@@ -16,7 +16,7 @@ name: thinker
 description: >
   Derin Düşünür (Thinking Model). Commander'ın planlarını adım adım mantık süzgecinden geçirir.
   Karmaşık saldırı vektörlerinde zafiyet zinciri tasarlar veya hatalı varsayımları reddeder.
-  Modeli: qwen/qwen3-max-thinking
+  Modeli: AGENTPENT_THINKING_MODEL (varsayilan: qwen/qwen3-max-thinking)
 tools: []
 model: qwen/qwen3-max-thinking
 ---

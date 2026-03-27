@@ -1,8 +1,7 @@
-"""AgentPent — Global settings via pydantic-settings."""
+"""AgentPent global settings via pydantic-settings."""
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
 from typing import Literal
 
@@ -14,7 +13,7 @@ _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 
 class Settings(BaseSettings):
-    """Centralised, env-driven configuration."""
+    """Centralized, env-driven configuration."""
 
     model_config = SettingsConfigDict(
         env_file=str(_PROJECT_ROOT / ".env"),
@@ -23,30 +22,34 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    # ── LLM ──────────────────────────────────────────────
-    openai_api_key: str = Field(default="", description="OpenAI / Codex API key")
+    # LLM
+    openai_api_key: str = Field(default="", description="OpenAI-compatible API key")
     openai_base_url: str = Field(
-        default="https://api.openai.com/v1",
+        default="https://openrouter.ai/api/v1",
         description="Base URL for the OpenAI-compatible API",
     )
     default_model: str = Field(
-        default="gpt-4o",
+        default="openai/gpt-5.4",
         description="Default model for agent calls",
     )
     planning_model: str = Field(
-        default="o3",
-        description="Model used for Commander / planning tasks",
+        default="anthropic/claude-sonnet-4.6",
+        description="Model used for commander / planning tasks",
+    )
+    thinking_model: str = Field(
+        default="qwen/qwen3-max-thinking",
+        description="Model used for deep reasoning / thinker tasks",
     )
     temperature: float = Field(default=0.2, ge=0.0, le=2.0)
     max_tokens: int = Field(default=4096, gt=0)
 
-    # ── Database ─────────────────────────────────────────
+    # Database
     db_path: str = Field(
         default=str(_PROJECT_ROOT / "data" / "agentpent.db"),
         description="SQLite database path",
     )
 
-    # ── Scope & Safety ───────────────────────────────────
+    # Scope and safety
     scopes_file: str = Field(
         default=str(_PROJECT_ROOT / "config" / "scopes.yaml"),
         description="YAML file defining allowed target scopes",
@@ -61,19 +64,18 @@ class Settings(BaseSettings):
         description="Max requests-per-second to any single target",
     )
 
-    # ── Logging ──────────────────────────────────────────
+    # Logging
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
     log_dir: str = Field(
         default=str(_PROJECT_ROOT / "logs"),
         description="Directory for audit / debug logs",
     )
 
-    # ── Reports ──────────────────────────────────────────
+    # Reports
     reports_dir: str = Field(
         default=str(_PROJECT_ROOT / "reports" / "output"),
         description="Directory for generated reports",
     )
 
 
-# Singleton – import from anywhere with `from config.settings import settings`
 settings = Settings()
