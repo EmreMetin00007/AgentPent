@@ -1,5 +1,3 @@
-version: "3.9"
-
 services:
   agentpent:
     build: .
@@ -14,8 +12,8 @@ services:
     ports:
       - "4444:4444"   # C2 Reverse Shell Listener
       - "8080:8080"   # Proxy Server
-    network_mode: host  # Pentest araçları için host network
+    network_mode: host  # Pentest tools need host network visibility
     restart: unless-stopped
     cap_add:
-      - NET_RAW       # nmap raw socket için
-      - NET_ADMIN     # network araçları için
+      - NET_RAW
+      - NET_ADMIN

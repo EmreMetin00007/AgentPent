@@ -1,12 +1,18 @@
-# ──────────────────────────────────────────────
-# AgentPent — Kali Linux Tabanlı Production Image
-# ──────────────────────────────────────────────
-FROM kalilinux/kali-rolling:latest
+# -----------------------------------------------------------------------------
+# AgentPent - Kali Linux production image
+# -----------------------------------------------------------------------------
+FROM kalilinux/kali-last-release:latest
 
 LABEL maintainer="AgentPent Team"
 LABEL description="LLM-Centered Multi-Agent Pentester"
 
-# Sistem güncelleme + temel pentest araçları
+ENV DEBIAN_FRONTEND=noninteractive \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    VIRTUAL_ENV=/opt/agentpent/.venv \
+    PATH="/opt/agentpent/.venv/bin:$PATH"
+
+# System packages + pentest toolchain
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 \
     python3-pip \
@@ -29,26 +35,28 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# Çalışma dizini
+# Application workspace
 WORKDIR /opt/agentpent
 
-# Python bağımlılıkları
+# Python dependencies in an isolated virtualenv
 COPY requirements.txt .
-RUN pip3 install --no-cache-dir --break-system-packages -r requirements.txt
+RUN python3 -m venv "$VIRTUAL_ENV" \
+    && python -m pip install --upgrade pip \
+    && python -m pip install --no-cache-dir -r requirements.txt
 
-# Uygulama dosyaları
+# Application source
 COPY . .
 
-# Veri ve log dizinleri
+# Runtime directories
 RUN mkdir -p data logs reports/output
 
-# Varsayılan port (C2 listener)
+# Default ports
 EXPOSE 4444 8080
 
-# Sağlık kontrolü
+# Health check
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
-    CMD python3 -c "from config.settings import settings; print('OK')" || exit 1
+    CMD python -m core.startup_check || exit 1
 
-# Giriş noktası
-ENTRYPOINT ["python3", "-m", "cli.main"]
+# Entrypoint
+ENTRYPOINT ["python", "-m", "cli.main"]
 CMD ["--help"]

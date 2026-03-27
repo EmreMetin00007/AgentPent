@@ -1,25 +1,25 @@
 <div align="center">
   <img src="https://raw.githubusercontent.com/github/explore/80688e429a7d4ef2fca1e82350fe8e3517d3494d/topics/kali-linux/kali-linux.png" width="100" alt="Kali Linux logo"/>
   <h1>AgentPent</h1>
-  <p><strong>LLM tabanlı, çok ajanlı güvenlik değerlendirme orkestrasyonu</strong></p>
-  <p>Yetkili ortamlarda keşif, tarama, analiz ve raporlama akışlarını tek bir CLI üzerinden yöneten deneysel bir Python projesi.</p>
+  <p><strong>LLM tabanli, cok ajanli guvenlik degerlendirme orkestrasyonu</strong></p>
+  <p>Yetkili ortamlarda kesif, tarama, analiz ve raporlama akislarini tek bir CLI uzerinden yoneten deneysel bir Python projesi.</p>
   <p>
     <a href="https://github.com/EmreMetin00007/AgentPent/actions/workflows/ci.yml"><img src="https://github.com/EmreMetin00007/AgentPent/actions/workflows/ci.yml/badge.svg" alt="CI status"/></a>
   </p>
 </div>
 
-## Genel Bakış
+## Genel Bakis
 
-AgentPent, farklı uzman rollere ayrılmış ajanları tek bir orkestrasyon katmanında birleştirir. Amaç, yetkili güvenlik testlerinde operatörün tekrar eden adımlarını azaltmak, kapsam kontrollerini merkezi hale getirmek ve çıktıların daha düzenli raporlanmasını sağlamaktır.
+AgentPent, farkli uzman rollere ayrilmis ajanlari tek bir orkestrasyon katmaninda birlestirir. Amac, yetkili guvenlik testlerinde operatorun tekrar eden adimlarini azaltmak, kapsam kontrollerini merkezi hale getirmek ve ciktilarin daha duzenli raporlanmasini saglamaktir.
 
-Mevcut yapı aşağıdaki alanlara odaklanır:
+Mevcut yapi asagidaki alanlara odaklanir:
 
-- Recon, OSINT, ağ, web uygulama ve raporlama için ayrılmış ajan modülleri
-- `scope_guard` ile hedef kapsamı doğrulama
-- HTML, JSON ve Markdown rapor üretimi
-- SQLite tabanlı görev ve RAG hafıza bileşenleri
-- Typer + Rich tabanlı CLI deneyimi
-- Testlerle desteklenen araç sarmalayıcıları
+- Recon, OSINT, ag, web uygulama ve raporlama icin ayrilmis ajan modulleri
+- `scope_guard` ile hedef kapsami dogrulama
+- HTML, JSON ve Markdown rapor uretimi
+- SQLite tabanli gorev ve RAG hafiza bilesenleri
+- Typer + Rich tabanli CLI deneyimi
+- Testlerle desteklenen arac sarmalayicilari
 
 ## Mimari
 
@@ -34,20 +34,20 @@ graph TD
     Commander --> Memory["SQLite / RAG Memory"]
 ```
 
-## Hızlı Başlangıç
+## Hizli Baslangic
 
 ### Gereksinimler
 
-- Python 3.11 önerilir
+- Python 3.11+ gerekir
 - `git`
-- Linux tarafında ek pentest araçları kullanacaksan `nmap`, `nikto`, `sqlmap`, `dirb`, `smbclient`
+- Linux tarafinda ek pentest araclari kullanacaksan `nmap`, `nikto`, `sqlmap`, `dirb`, `smbclient`
 
 ### Kurulum
 
 ```bash
 git clone https://github.com/EmreMetin00007/AgentPent.git
 cd AgentPent
-python -m venv .venv
+py -3.11 -m venv .venv
 ```
 
 Linux ve macOS:
@@ -62,22 +62,23 @@ cp .env.example .env
 Windows PowerShell:
 
 ```powershell
+py -3.11 -m venv .venv
 .venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
 Copy-Item .env.example .env
 ```
 
-Alternatif olarak Linux/Kali ortamında hızlı kurulum için:
+Alternatif olarak Linux/Kali ortaminda hizli kurulum icin:
 
 ```bash
 chmod +x setup.sh
 ./setup.sh
 ```
 
-## Konfigürasyon
+## Konfigurasyon
 
-Temel ayarlar `.env` üzerinden yönetilir. En sık kullanılan alanlar:
+Temel ayarlar `.env` uzerinden yonetilir. En sik kullanilan alanlar:
 
 - `AGENTPENT_OPENAI_API_KEY`
 - `AGENTPENT_OPENAI_BASE_URL`
@@ -86,67 +87,65 @@ Temel ayarlar `.env` üzerinden yönetilir. En sık kullanılan alanlar:
 - `AGENTPENT_REQUIRE_SCOPE`
 - `AGENTPENT_LOG_LEVEL`
 
-Varsayılan örnekler için `.env.example` dosyasını kullanabilirsin.
+Varsayilan ornekler icin `.env.example` dosyasini kullanabilirsin.
 
-## CLI Kullanımı
+## CLI Kullanimi
 
-Kayıtlı ajanları listeleme:
+Kayitli ajanlari listeleme:
 
 ```bash
 python -m cli.main agents
 ```
 
-Scope profillerini görüntüleme:
+Scope profillerini goruntuleme:
 
 ```bash
 python -m cli.main scope
 python -m cli.main check 10.10.10.5 --profile default
 ```
 
-Demo rapor üretme:
+Demo rapor uretme:
 
 ```bash
 python -m cli.main report --demo --format html
 ```
 
-Bir görev çalıştırma:
+Bir gorev calistirma:
 
 ```bash
 python -m cli.main mission --name "Demo Mission" --target 10.10.10.5
 ```
 
-Tek faz çalıştırma:
+Tek faz calistirma:
 
 ```bash
 python -m cli.main mission --name "Recon Only" --target example.lab --phase reconnaissance
 ```
 
-## Geliştirme
+## Gelistirme
 
-Testleri çalıştırma:
+Testleri calistirma:
 
 ```bash
 python -m pytest
 ```
 
-`pytest.ini` yalnızca kök `tests/` dizinini toplar. Bu sayede çalışma klasöründe tutulan gömülü veya harici repolar test keşfini bozmaz.
+`pytest.ini` yalnizca kok `tests/` dizinini toplar. Bu sayede calisma klasorunde tutulan gomulu veya harici repolar test kesfini bozmaz.
 
-Önerilen geliştirme akışı:
+Onerilen gelistirme akisi:
 
-1. Sanal ortamı etkinleştir.
-2. `python -m pip install -r requirements.txt` ile bağımlılıkları kur.
-3. Değişiklik yap.
-4. `python -m pytest` ile doğrula.
+1. Sanal ortami etkinlestir.
+2. `python -m pip install -r requirements.txt` ile bagimliliklari kur.
+3. Degisiklik yap.
+4. `python -m pytest` ile dogrula.
 5. Commit ve push et.
 
 ## CI ve Release
 
-- GitHub Actions yapılandırması: `.github/workflows/ci.yml`
-- Sürüm notları: `CHANGELOG.md`
-- Manuel yayın adımları: `RELEASE.md`
-
-İleride istersen bu yapıyı otomatik tag ve GitHub Release akışıyla da genişletebiliriz.
+- GitHub Actions yapilandirmasi: `.github/workflows/ci.yml`
+- Surum notlari: `CHANGELOG.md`
+- Manuel yayin adimlari: `RELEASE.md`
 
 ## Yasal Not
 
-Bu repo yalnızca açık izin verilen laboratuvarlar, dahili güvenlik testleri ve yetkili değerlendirme senaryoları için kullanılmalıdır. Hedef kapsamı ve erişim yetkisi operatörün sorumluluğundadır.
+Bu repo yalnizca acik izin verilen laboratuvarlar, dahili guvenlik testleri ve yetkili degerlendirme senaryolari icin kullanilmalidir. Hedef kapsami ve erisim yetkisi operatorun sorumlulugundadir.
