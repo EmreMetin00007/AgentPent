@@ -1,0 +1,120 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+VENV_DIR="${SCRIPT_DIR}/.venv"
+REQ_FILE="${SCRIPT_DIR}/requirements.txt"
+ENV_FILE="${SCRIPT_DIR}/.env"
+ENV_EXAMPLE="${SCRIPT_DIR}/.env.example"
+STAMP_FILE="${VENV_DIR}/.agentpent-requirements.sha256"
+
+pick_python() {
+    local candidate
+
+    if [[ -n "${AGENTPENT_PYTHON:-}" ]]; then
+        candidate="${AGENTPENT_PYTHON}"
+        if ! command -v "${candidate}" >/dev/null 2>&1; then
+            echo "AgentPent could not find the requested interpreter: ${candidate}" >&2
+            exit 1
+        fi
+        echo "${candidate}"
+        return
+    fi
+
+    for candidate in python3.11 python3; do
+        if ! command -v "${candidate}" >/dev/null 2>&1; then
+            continue
+        fi
+        if "${candidate}" - <<'PY' >/dev/null 2>&1
+import sys
+raise SystemExit(0 if sys.version_info >= (3, 11) else 1)
+PY
+        then
+            echo "${candidate}"
+            return
+        fi
+    done
+
+    echo "AgentPent requires Python 3.11 or newer. Install python3.11 and python3.11-venv first." >&2
+    exit 1
+}
+
+hash_file() {
+    local path="$1"
+
+    if command -v sha256sum >/dev/null 2>&1; then
+        sha256sum "${path}" | awk '{print $1}'
+        return
+    fi
+
+    if command -v shasum >/dev/null 2>&1; then
+        shasum -a 256 "${path}" | awk '{print $1}'
+        return
+    fi
+
+    "${PYTHON_BIN}" - <<'PY' "${path}"
+from __future__ import annotations
+
+import hashlib
+import pathlib
+import sys
+
+target = pathlib.Path(sys.argv[1])
+print(hashlib.sha256(target.read_bytes()).hexdigest())
+PY
+}
+
+ensure_venv() {
+    if [[ -x "${VENV_DIR}/bin/python" ]]; then
+        return
+    fi
+
+    echo "[*] Creating Python virtual environment..."
+    "${PYTHON_BIN}" -m venv "${VENV_DIR}"
+}
+
+ensure_requirements() {
+    local current_hash installed_hash
+
+    current_hash="$(hash_file "${REQ_FILE}")"
+    installed_hash=""
+    if [[ -f "${STAMP_FILE}" ]]; then
+        installed_hash="$(<"${STAMP_FILE}")"
+    fi
+
+    if [[ "${current_hash}" == "${installed_hash}" ]] && [[ -x "${VENV_DIR}/bin/python" ]]; then
+        return
+    fi
+
+    echo "[*] Installing Python dependencies..."
+    "${VENV_DIR}/bin/python" -m pip install --upgrade pip
+    "${VENV_DIR}/bin/python" -m pip install -r "${REQ_FILE}"
+    printf '%s' "${current_hash}" > "${STAMP_FILE}"
+}
+
+ensure_env_file() {
+    if [[ -f "${ENV_FILE}" || ! -f "${ENV_EXAMPLE}" ]]; then
+        return
+    fi
+
+    cp "${ENV_EXAMPLE}" "${ENV_FILE}"
+    echo "[*] Created .env from .env.example"
+    echo "[!] Add your OpenRouter API key to .env before running live missions."
+}
+
+prepare_directories() {
+    mkdir -p "${SCRIPT_DIR}/data" "${SCRIPT_DIR}/logs" "${SCRIPT_DIR}/reports/output"
+}
+
+main() {
+    PYTHON_BIN="$(pick_python)"
+
+    prepare_directories
+    ensure_venv
+    ensure_requirements
+    ensure_env_file
+
+    exec "${VENV_DIR}/bin/python" -m cli.main "$@"
+}
+
+main "$@"

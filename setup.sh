@@ -1,40 +1,32 @@
-#!/bin/bash
-# ------------------------------------------------------------------------------
-# AgentPent - Kali Linux Deployment Script
-# ------------------------------------------------------------------------------
-set -e
+#!/usr/bin/env bash
+set -euo pipefail
 
-echo "[*] AgentPent Kurulumu Başlıyor..."
+SCRIPT_DIR="$(cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# 1. Sistem ve Ağ Paketlerini Güncelle
-echo "[*] Kali / Ubuntu Repoları Güncelleniyor..."
+echo "[*] AgentPent full setup is starting..."
+echo "[*] Updating apt package indexes..."
 sudo apt-get update
-sudo apt-get upgrade -y
 
-# 2. Pentest Tool'larını Yükle (AgentPent'in kullandığı core toollar)
-echo "[*] Zorunlu Pentest Araçları (Nmap, Nikto, Sqlmap vb.) Yükleniyor..."
-sudo apt-get install -y nmap nikto sqlmap dirb smbclient python3-pip python3-venv git
+echo "[*] Installing required system packages..."
+sudo apt-get install -y \
+    git \
+    python3 \
+    python3-pip \
+    python3-venv \
+    python3.11 \
+    python3.11-venv \
+    nmap \
+    nikto \
+    sqlmap \
+    dirb \
+    smbclient
 
-# 3. Python Virtual Environment Oluştur
-echo "[*] Python Virtual Environment (agent-env) oluşturuluyor..."
-python3 -m venv agent-env
-source agent-env/bin/activate
+echo "[*] Bootstrapping the local AgentPent launcher..."
+"${SCRIPT_DIR}/agentpent" --help >/dev/null
 
-# 4. PyPI Gereksinimlerini Yükle
-echo "[*] Python kütüphaneleri yükleniyor..."
-pip install --upgrade pip
-pip install -r requirements.txt
-
-# 5. Env Şablonunu Kopyala
-if [ ! -f .env ]; then
-    echo "[*] .env.example dosyası .env olarak kopyalanıyor..."
-    cp .env.example .env
-    echo "[!] Lütfen .env dosyasını açıp OPENAI_API_KEY bilginizi giriniz!"
-fi
-
-echo ""
-echo "[+] Kurulum Tamamlandı! 🔥"
-echo "[+] Çalıştırmak için şu komutları kullanın:"
-echo "    source agent-env/bin/activate"
-echo "    python -m cli.main report --demo --format html"
-echo "    python -m cli.main mission --name 'Kali Test' --target '10.10.10.5'"
+echo
+echo "[+] Setup completed."
+echo "[+] Use the project directly from the repo root with:"
+echo "    ./agentpent --help"
+echo "    ./agentpent agents"
+echo "    ./agentpent mission --name 'Kali Test' --target '127.0.0.1' --phase reconnaissance"

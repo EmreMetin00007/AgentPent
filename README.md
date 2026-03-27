@@ -44,6 +44,17 @@ graph TD
 
 ### Kurulum
 
+En hizli Linux/Kali kullanimi:
+
+```bash
+git clone https://github.com/EmreMetin00007/AgentPent.git
+cd AgentPent
+chmod +x agentpent
+./agentpent --help
+```
+
+Bu launcher ilk calistirmada `.venv` olusturur, Python bagimliliklarini kurar ve `.env` yoksa `.env.example` uzerinden olusturur.
+
 ```bash
 git clone https://github.com/EmreMetin00007/AgentPent.git
 cd AgentPent
@@ -95,32 +106,32 @@ Varsayilan ornekler icin `.env.example` dosyasini kullanabilirsin.
 Kayitli ajanlari listeleme:
 
 ```bash
-python -m cli.main agents
+./agentpent agents
 ```
 
 Scope profillerini goruntuleme:
 
 ```bash
-python -m cli.main scope
-python -m cli.main check 10.10.10.5 --profile default
+./agentpent scope
+./agentpent check 10.10.10.5 --profile default
 ```
 
 Demo rapor uretme:
 
 ```bash
-python -m cli.main report --demo --format html
+./agentpent report --demo --format html
 ```
 
 Bir gorev calistirma:
 
 ```bash
-python -m cli.main mission --name "Demo Mission" --target 10.10.10.5
+./agentpent mission --name "Demo Mission" --target 10.10.10.5
 ```
 
 Tek faz calistirma:
 
 ```bash
-python -m cli.main mission --name "Recon Only" --target example.lab --phase reconnaissance
+./agentpent mission --name "Recon Only" --target example.lab --phase reconnaissance
 ```
 
 ## Gelistirme
