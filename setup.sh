@@ -8,11 +8,12 @@ echo "[*] AgentPent Kurulumu Başlıyor..."
 
 # 1. Sistem ve Ağ Paketlerini Güncelle
 echo "[*] Kali / Ubuntu Repoları Güncelleniyor..."
-sudo apt-update -y && sudo apt upgrade -y
+sudo apt-get update
+sudo apt-get upgrade -y
 
 # 2. Pentest Tool'larını Yükle (AgentPent'in kullandığı core toollar)
 echo "[*] Zorunlu Pentest Araçları (Nmap, Nikto, Sqlmap vb.) Yükleniyor..."
-sudo apt install -y nmap nikto sqlmap dirb smbclient python3-pip python3-venv git
+sudo apt-get install -y nmap nikto sqlmap dirb smbclient python3-pip python3-venv git
 
 # 3. Python Virtual Environment Oluştur
 echo "[*] Python Virtual Environment (agent-env) oluşturuluyor..."

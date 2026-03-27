@@ -54,7 +54,9 @@ class KaliTerminalTool(BaseTool):
                     process.communicate(), timeout=self.timeout
                 )
             except asyncio.TimeoutError:
-                process.kill()
+                kill_result = process.kill()
+                if asyncio.iscoroutine(kill_result):
+                    await kill_result
                 await process.communicate()
                 logger.error("[KaliTerminal] Command timed out: %s", command)
                 return ToolResult(
