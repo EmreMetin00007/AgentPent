@@ -19,6 +19,7 @@ class Settings(BaseSettings):
         env_file=str(_PROJECT_ROOT / ".env"),
         env_file_encoding="utf-8",
         env_prefix="AGENTPENT_",
+        env_ignore_empty=True,
         extra="ignore",
     )
 

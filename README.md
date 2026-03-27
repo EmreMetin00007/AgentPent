@@ -54,6 +54,7 @@ chmod +x agentpent
 ```
 
 Bu launcher ilk calistirmada `.venv` olusturur, Python bagimliliklarini kurar ve `.env` yoksa `.env.example` uzerinden olusturur.
+Olusan `.env` dosyasinda satirlari bos birakirsan uygulama varsayilan degerleri kullanir; canli LLM gorevleri icin en az `AGENTPENT_OPENAI_API_KEY` alanini doldurman gerekir.
 
 ```bash
 git clone https://github.com/EmreMetin00007/AgentPent.git
@@ -100,6 +101,7 @@ Temel ayarlar `.env` uzerinden yonetilir. En sik kullanilan alanlar:
 - `AGENTPENT_LOG_LEVEL`
 
 Varsayilan ornekler icin `.env.example` dosyasini kullanabilirsin.
+Bu dosyada degerler bos birakilmistir; yalnizca override etmek istedigin alanlari doldurman yeterlidir.
 
 ## CLI Kullanimi
 
