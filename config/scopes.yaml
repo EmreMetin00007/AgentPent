@@ -1,0 +1,84 @@
+# ──────────────────────────────────────────────
+# AgentPent — Target Scope Configuration
+# ──────────────────────────────────────────────
+# Bu dosya, pentesting sırasında izin verilen hedefleri tanımlar.
+# Kapsam dışı hedeflere araç çağrıları otomatik engellenir.
+
+# Aktif scope profili
+active_profile: default
+
+profiles:
+  # ── Varsayılan profil ────────────────────────
+  default:
+    name: "Default Lab Scope"
+    description: "Genel lab ve bug bounty hedefleri"
+
+    # İzin verilen IP aralıkları (CIDR)
+    allowed_cidrs:
+      - "10.0.0.0/8"
+      - "172.16.0.0/12"
+      - "192.168.0.0/16"
+      - "127.0.0.0/8"
+
+    # İzin verilen domain'ler (wildcard destekler)
+    allowed_domains:
+      - "*.local"
+      - "*.lab"
+      - "*.test"
+      - "localhost"
+
+    # İzin verilen port aralıkları
+    allowed_ports:
+      - "1-65535"
+
+    # Yasaklanan hedefler (her zaman engellenir)
+    denied_cidrs: []
+    denied_domains:
+      - "*.gov"
+      - "*.mil"
+      - "*.edu"
+
+  # ── Bug Bounty profili ──────────────────────
+  bugbounty:
+    name: "Bug Bounty Scope"
+    description: "Bug bounty programı kapsamı"
+
+    allowed_cidrs: []
+
+    allowed_domains:
+      # Buraya hedef platformun domain'lerini ekle
+      - "*.example.com"
+
+    allowed_ports:
+      - "80"
+      - "443"
+      - "8080"
+      - "8443"
+
+    denied_cidrs:
+      - "0.0.0.0/0"  # Tüm IP'ler engellenir, sadece domain bazlı
+
+    denied_domains:
+      - "*.gov"
+      - "*.mil"
+
+  # ── HTB / THM profili ──────────────────────
+  ctf:
+    name: "CTF / Lab Scope"
+    description: "HackTheBox, TryHackMe gibi lab ortamları"
+
+    allowed_cidrs:
+      - "10.10.0.0/16"    # HTB VPN
+      - "10.13.0.0/16"    # THM VPN
+      - "192.168.0.0/16"
+
+    allowed_domains:
+      - "*.htb"
+      - "*.thm"
+      - "localhost"
+
+    allowed_ports:
+      - "1-65535"
+
+    denied_cidrs: []
+    denied_domains: []

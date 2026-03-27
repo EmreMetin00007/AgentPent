@@ -1,0 +1,45 @@
+# ── Python ──────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+*.egg
+
+# ── Environment ─────────────────────────────
+.env
+.venv/
+venv/
+env/
+
+# ── IDE ─────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ── Logs & Output ───────────────────────────
+logs/
+*.log
+cli_out*.txt
+test_out*.txt
+test_kali*.txt
+pytest_err*.log
+err*.log
+
+# ── Data ────────────────────────────────────
+data/*.db
+reports/output/
+
+# ── OS ──────────────────────────────────────
+.DS_Store
+Thumbs.db
+
+# ── Pytest ──────────────────────────────────
+.pytest_cache/
+test_results.txt
+
+# ── Misc ────────────────────────────────────
+prices.txt
+everything-claude-code/

@@ -1,0 +1,21 @@
+version: "3.9"
+
+services:
+  agentpent:
+    build: .
+    container_name: agentpent
+    env_file:
+      - .env
+    volumes:
+      - ./data:/opt/agentpent/data
+      - ./logs:/opt/agentpent/logs
+      - ./reports:/opt/agentpent/reports
+      - ./config:/opt/agentpent/config
+    ports:
+      - "4444:4444"   # C2 Reverse Shell Listener
+      - "8080:8080"   # Proxy Server
+    network_mode: host  # Pentest araçları için host network
+    restart: unless-stopped
+    cap_add:
+      - NET_RAW       # nmap raw socket için
+      - NET_ADMIN     # network araçları için
