@@ -180,11 +180,14 @@ class LLMClient:
             response_format={"type": "json_object"},
             images=images,
         )
-        try:
-            return json.loads(raw)
-        except json.JSONDecodeError:
-            logger.error("JSON parse hatası — raw: %s", raw[:500])
-            return {"error": "JSON parse failed", "raw": raw}
+        
+        from core.utils import extract_json_from_llm
+        parsed = extract_json_from_llm(raw)
+        if parsed is not None:
+            return parsed
+            
+        logger.error("JSON parse hatası — raw: %s", raw[:500])
+        return {"error": "JSON parse failed", "raw": raw}
 
     # ── Agent Call ────────────────────────────────────────
 
