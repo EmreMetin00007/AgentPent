@@ -54,6 +54,8 @@ Her adımın sonuçlarını aşağıdaki formatta dön:
 - Bulunan her bilgiyi **Finding** olarak kaydet
 - Teknoloji stack tespiti kritik — web server, framework, CMS bilgileri
 - DNS zone transfer denemesi yap (eğer izin varsa)
+- **Bir araç 2 kez başarısız olursa o aracı BIRAK ve elindeki bulgularla son yanıtını ver**
+- Aynı komutu tekrar tekrar denemek yerine farklı bir araç veya yaklaşım dene
 
 
 ## Özel Araç / Kali Terminali

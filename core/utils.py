@@ -93,6 +93,30 @@ def sanitize_target(target: str) -> str:
     return target
 
 
+
+# ── Tool parametre şemaları — LLM'e araç kullanımını öğretir ──
+TOOL_PARAM_SCHEMAS: Dict[str, str] = {
+    "nmap": "target (str, ZORUNLU), scan_type (str: quick|full|service|vuln|stealth|udp), ports (str: '80,443' veya '1-1000'), extra_flags (list[str])",
+    "sqlmap": "target (str URL, ZORUNLU — ör: http://IP/page.php?id=1), method (str: GET|POST), data (str: POST body), level (int: 1-5), risk (int: 1-3), dbs (bool), dump (bool)",
+    "ffuf": "target (str URL+FUZZ, ZORUNLU — ör: http://IP/FUZZ), wordlist (str, varsayılan: /usr/share/wordlists/dirb/common.txt), mode (str: dir|vhost|param), extensions (str: '.php,.html'), filter_status (str: '404'), threads (int)",
+    "xsstrike": "target (str URL+parametre, ZORUNLU — ör: http://IP/page?q=test), crawl (bool), data (str: POST body)",
+    "nikto": "target (str URL, ZORUNLU — ör: http://IP), port (int), ssl (bool), tuning (str)",
+    "browser_vision": "target (str URL, ZORUNLU)",
+    "http_repeater": "url (str, ZORUNLU), method (str: GET|POST|PUT), headers (dict), data (str: body), timeout (int)",
+    "kaliterminal": "command (str, ZORUNLU — tam shell komutu)",
+    "whois": "target (str IP/domain, ZORUNLU)",
+    "nuclei": "target (str, ZORUNLU), templates (str), severity (str: critical,high,medium,low)",
+    "graph_add_node": "id (str, ZORUNLU), type (str: host|service|vuln|credential|session)",
+    "graph_add_edge": "source (str, ZORUNLU), target (str, ZORUNLU), relation (str)",
+    "graph_view": "(parametre gerekmez)",
+    "rag_search": "query (str, ZORUNLU)",
+    "rag_store": "key (str, ZORUNLU), value (str, ZORUNLU)",
+    "linpeas": "target (str, ZORUNLU)",
+    "metasploit": "target (str, ZORUNLU), module (str), payload (str), options (dict)",
+    "exploit_builder": "target (str, ZORUNLU), vuln_id (str), exploit_type (str)",
+}
+
+
 def build_tool_definitions(tools: Dict[str, Any]) -> str:
     """Agent'ın kayıtlı araçlarından LLM için tool definition metni üretir."""
     if not tools:
@@ -111,6 +135,11 @@ def build_tool_definitions(tools: Dict[str, Any]) -> str:
 
     for name, tool in tools.items():
         desc = getattr(tool, "description", "")
-        lines.append(f"- **{name}**: {desc}")
+        param_schema = TOOL_PARAM_SCHEMAS.get(name, "")
+        if param_schema:
+            lines.append(f"- **{name}**: {desc}\n  Parametreler: {param_schema}")
+        else:
+            lines.append(f"- **{name}**: {desc}")
 
     return "\n".join(lines)
+

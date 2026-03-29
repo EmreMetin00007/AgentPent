@@ -85,7 +85,7 @@ class Settings(BaseSettings):
         description="Maximum random delay (seconds) between requests — IDS evasion",
     )
     max_react_iterations: int = Field(
-        default=20,
+        default=10,
         ge=1,
         description="Maximum ReAct loop iterations per agent run",
     )
