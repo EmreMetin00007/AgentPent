@@ -1,7 +1,7 @@
 """AgentPent — Base Tool Wrapper.
 
 Tüm dış araç entegrasyonlarının taban sınıfı.
-Her araç çağrısı scope guard'dan geçer.
+Her araç çağrısı scope guard + rate limiter + audit'ten geçer.
 """
 
 from __future__ import annotations
@@ -14,6 +14,8 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
 from core.scope_guard import OutOfScopeError, scope_guard
+from core.rate_limiter import rate_limiter
+from core.audit import audit
 from config.settings import settings
 
 logger = logging.getLogger("agentpent.tools")
@@ -39,6 +41,38 @@ class ToolResult:
         return "{} [{}] {:.0f}ms".format(status, self.tool_name, self.duration_ms)
 
 
+# ── Tool Metrikleri ──────────────────────────────────────
+
+class _ToolMetrics:
+    """Araç kullanım istatistikleri."""
+
+    def __init__(self):
+        self.total_calls = 0
+        self.successful = 0
+        self.failed = 0
+        self.total_duration_ms = 0.0
+
+    def record(self, success: bool, duration_ms: float) -> None:
+        self.total_calls += 1
+        if success:
+            self.successful += 1
+        else:
+            self.failed += 1
+        self.total_duration_ms += duration_ms
+
+    @property
+    def avg_duration_ms(self) -> float:
+        return self.total_duration_ms / max(self.total_calls, 1)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "total": self.total_calls,
+            "success": self.successful,
+            "failed": self.failed,
+            "avg_ms": round(self.avg_duration_ms, 1),
+        }
+
+
 class BaseTool(ABC):
     """Tüm pentest araçlarının taban wrapper sınıfı."""
 
@@ -48,6 +82,7 @@ class BaseTool(ABC):
 
     def __init__(self):
         self._available: Optional[bool] = None
+        self._metrics = _ToolMetrics()
 
     # ── Kullanılabilirlik Kontrolü ────────────────────────
 
@@ -132,11 +167,12 @@ class BaseTool(ABC):
     # ── Ana Giriş Noktası ────────────────────────────────
 
     async def execute(self, params: Dict[str, Any]) -> ToolResult:
-        """Scope guard'dan geçir ve aracı çalıştır."""
+        """Scope guard + rate limiter + audit'ten geçir ve aracı çalıştır."""
         target = params.get("target", "")
         port = params.get("port")
+        start = time.monotonic()
 
-        # Kapsam kontrolü
+        # 1. Kapsam kontrolü
         try:
             self.validate_scope(target, port)
         except OutOfScopeError as exc:
@@ -147,7 +183,7 @@ class BaseTool(ABC):
                 error=str(exc),
             )
 
-        # Kullanılabilirlik
+        # 2. Kullanılabilirlik
         if self.binary and not await self.is_available():
             return ToolResult(
                 tool_name=self.name,
@@ -155,7 +191,23 @@ class BaseTool(ABC):
                 error="{} bulunamadı — kurulum gerekli".format(self.binary),
             )
 
-        return await self._run(params)
+        # 3. Rate limiter — target bazlı throttle + jitter
+        await rate_limiter.acquire(target or "global")
+
+        try:
+            result = await self._run(params)
+        finally:
+            rate_limiter.release()
+
+        # 4. Metrik kaydet
+        elapsed = (time.monotonic() - start) * 1000
+        self._metrics.record(result.success, elapsed)
+
+        return result
+
+    @property
+    def metrics(self) -> Dict[str, Any]:
+        return self._metrics.to_dict()
 
     @abstractmethod
     async def _run(self, params: Dict[str, Any]) -> ToolResult:

@@ -2,22 +2,59 @@
 
 Ana iş akışı motoru. Commander agent'ı kullanarak
 tüm pentest operasyonunu yönetir.
+
+Production features:
+- Retry/backoff ile hata toleransı
+- Mission timeout
+- Structured audit trail
+- Graceful shutdown
 """
 
 from __future__ import annotations
 
 import asyncio
 import logging
+import time
 from typing import Dict, List, Optional
 
 from agents.base_agent import AgentResult, BaseAgent
 from agents.commander.agent import CommanderAgent
+from core.audit import audit
 from core.memory import ConversationMemory
 from core.mission import AttackPhase, Mission, MissionStatus
 from core.scope_guard import scope_guard
+from core.utils import extract_json_from_llm
 from config.settings import settings
 
 logger = logging.getLogger("agentpent.orchestrator")
+
+# ── Retry Helpers ────────────────────────────────────────
+
+_DEFAULT_MAX_RETRIES = 3
+_DEFAULT_BACKOFF_BASE = 1.5  # saniye
+
+
+async def _retry_async(coro_factory, *, max_retries=_DEFAULT_MAX_RETRIES, label=""):
+    """Async callable'ı exponential backoff ile retry et."""
+    last_exc = None
+    for attempt in range(1, max_retries + 1):
+        try:
+            return await coro_factory()
+        except Exception as exc:
+            last_exc = exc
+            if attempt < max_retries:
+                wait = _DEFAULT_BACKOFF_BASE ** attempt
+                logger.warning(
+                    "[Retry] %s — deneme %d/%d başarısız: %s (%.1fs bekle)",
+                    label, attempt, max_retries, exc, wait,
+                )
+                await asyncio.sleep(wait)
+            else:
+                logger.error(
+                    "[Retry] %s — %d deneme sonrası başarısız: %s",
+                    label, max_retries, exc,
+                )
+    raise last_exc  # type: ignore[misc]
 
 
 class Orchestrator:
@@ -97,6 +134,20 @@ class Orchestrator:
                 name, ", ".join(targets), scope_profile
             )
         )
+        audit.set_mission(mission.id)
+        audit.log("mission_created", detail={
+            "name": name, "targets": targets, "profile": scope_profile,
+        })
+
+        # Graph tools modülünü mission graph'ına bağla
+        try:
+            from tools.graph_tools import set_active_graph
+            from core.attack_graph import AttackGraph
+            mission.attack_graph = AttackGraph()
+            set_active_graph(mission.attack_graph)
+        except ImportError:
+            pass
+
         logger.info("Mission oluşturuldu: %s (hedef: %s)", name, targets)
         return mission
 
@@ -117,73 +168,122 @@ class Orchestrator:
 
         mission.status = MissionStatus.ACTIVE
         self._running = True
+        mission_start = time.monotonic()
+        timeout = settings.mission_timeout_seconds
+
         logger.info("=" * 60)
         logger.info("OPERASYON BAŞLATILDI: %s", mission.name)
         logger.info("=" * 60)
 
         try:
             while self._running and mission.status == MissionStatus.ACTIVE:
+                # Mission timeout kontrolü
+                elapsed = time.monotonic() - mission_start
+                if elapsed > timeout:
+                    logger.warning(
+                        "⏰ Mission timeout! (%.0fs > %ds)", elapsed, timeout
+                    )
+                    audit.log("mission_timeout", detail={
+                        "elapsed_seconds": round(elapsed),
+                        "timeout": timeout,
+                    })
+                    mission.status = MissionStatus.COMPLETED
+                    break
+
                 phase = mission.current_phase
                 logger.info("-" * 40)
                 logger.info("FAZ: %s", phase.value.upper())
                 logger.info("-" * 40)
 
-                decision = await self.commander.decide_next(mission, self._memory)
+                # Commander kararı — retry ile
+                decision = await _retry_async(
+                    lambda: self.commander.decide_next(mission, self._memory),
+                    label="commander.decide_next",
+                )
                 logger.info("Commander kararı: %s", decision.get("decision"))
+                audit.decision(
+                    decision.get("decision", "unknown"),
+                    detail={"reasoning": str(decision.get("reasoning", ""))[:300]},
+                )
 
-                # ── 🛡️ Multi-Agent Debate Loop (Jüri) ────────────────
+                # ── Multi-Agent Debate Loop (Jüri) ────────────────
                 import json
                 critic = self.get_agent("critic")
                 thinker = self.get_agent("thinker")
-                # Sadece spesifik işler atanırken tartış
-                if decision.get("tasks") and decision.get("decision") in ("specific_agent", "next_phase", ""):
+
+                if decision.get("tasks") and decision.get("decision") in (
+                    "specific_agent", "next_phase", ""
+                ):
                     for _ in range(2):
                         vetoed = False
-                        
-                        # 1. 🧠 Thinker (Mantık / Derin Düşünce) Kontrolü
+
+                        # 1. Thinker Kontrolü
                         if thinker:
-                            prompt_t = f"Commander planı: {json.dumps(decision, ensure_ascii=False)}\nDerinlemesine düşün (Reasoning) ve potansiyel riskleri/mantık hatalarını incele."
-                            t_res = await thinker.run(prompt_t, mission, self._memory)
                             try:
-                                t_data = json.loads(t_res.raw_response)
-                                if not t_data.get("approved", True):
+                                prompt_t = "Commander planı: {}\nDerinlemesine düşün ve potansiyel riskleri incele.".format(
+                                    json.dumps(decision, ensure_ascii=False)
+                                )
+                                t_res = await _retry_async(
+                                    lambda: thinker.run(prompt_t, mission, self._memory),
+                                    label="thinker.review",
+                                )
+                                t_data = extract_json_from_llm(t_res.raw_response)
+                                if t_data and not t_data.get("approved", True):
                                     reason = t_data.get("reason", "Bilinmeyen itiraz.")
                                     logger.warning("🧠 Thinker Veto Etti: %s", reason)
-                                    self._memory.add_system(f"🚨 THINKER REDDETTİ: {reason}. Lütfen planı buna göre güncelle.")
-                                    decision = await self.commander.decide_next(mission, self._memory)
+                                    audit.veto("thinker", reason)
+                                    self._memory.add_system(
+                                        "🚨 THINKER REDDETTİ: {}. Planı güncelle.".format(reason)
+                                    )
+                                    decision = await _retry_async(
+                                        lambda: self.commander.decide_next(mission, self._memory),
+                                        label="commander.re-decide(thinker)",
+                                    )
                                     vetoed = True
                                 else:
-                                    logger.info("🧠 Thinker ONAYLADI: %s", t_data.get("reason", "Sorun yok."))
+                                    r = t_data.get("reason", "OK") if t_data else "Parse edilemedi"
+                                    logger.info("🧠 Thinker ONAYLADI: %s", r)
                             except Exception as e:
-                                logger.debug("Thinker parse hatası: %s", e)
+                                logger.warning("Thinker hatası (atlanıyor): %s", e)
 
-                        # 2. 🛡️ Critic (OPSEC / Halisülasyon) Kontrolü
+                        # 2. Critic Kontrolü
                         if not vetoed and critic:
-                            prompt_c = f"İncele (OPSEC/Halisülasyon/Mantık):\n{json.dumps(decision, ensure_ascii=False)}"
-                            critic_res = await critic.run(prompt_c, mission, self._memory)
                             try:
-                                c_data = json.loads(critic_res.raw_response)
-                                if not c_data.get("approved", True):
+                                prompt_c = "İncele (OPSEC/Halisülasyon):\n{}".format(
+                                    json.dumps(decision, ensure_ascii=False)
+                                )
+                                critic_res = await _retry_async(
+                                    lambda: critic.run(prompt_c, mission, self._memory),
+                                    label="critic.review",
+                                )
+                                c_data = extract_json_from_llm(critic_res.raw_response)
+                                if c_data and not c_data.get("approved", True):
                                     reason = c_data.get("reason", "Bilinmeyen itiraz.")
                                     logger.warning("🛡️ Critic Veto Etti: %s", reason)
-                                    self._memory.add_system(f"🚨 CRITIC REDDETTİ: {reason}. Lütfen planı buna göre güncelle/düzelt.")
-                                    decision = await self.commander.decide_next(mission, self._memory)
+                                    audit.veto("critic", reason)
+                                    self._memory.add_system(
+                                        "🚨 CRITIC REDDETTİ: {}. Planı güncelle.".format(reason)
+                                    )
+                                    decision = await _retry_async(
+                                        lambda: self.commander.decide_next(mission, self._memory),
+                                        label="commander.re-decide(critic)",
+                                    )
                                     vetoed = True
                                 else:
-                                    logger.info("🛡️ Critic ONAYLADI: %s", c_data.get("reason", "Sorun yok."))
+                                    r = c_data.get("reason", "OK") if c_data else "Parse edilemedi"
+                                    logger.info("🛡️ Critic ONAYLADI: %s", r)
                             except Exception as e:
-                                logger.debug("Critic parse hatası: %s", e)
+                                logger.warning("Critic hatası (atlanıyor): %s", e)
 
-                        # Eğer kimse veto etmediyse döngüyü kır, işleme başla
                         if not vetoed:
-                            logger.info("⚖️ Komite (Critic & Thinker) Konsensüsü Sağlandı. İşleme geçiliyor...")
+                            logger.info("⚖️ Konsensüs sağlandı. İşleme geçiliyor...")
                             break
-                # ── 🛡️ ────────────────────────────────────────────────
 
                 action = decision.get("decision", "next_phase")
 
                 if action == "abort":
                     logger.warning("Commander: ABORT kararı")
+                    audit.decision("abort")
                     mission.status = MissionStatus.ABORTED
                     break
 
@@ -204,7 +304,13 @@ class Orchestrator:
                         mission.add_finding(finding)
 
                 if action in ("next_phase", ""):
+                    prev_phase = mission.current_phase
                     next_phase = mission.advance_phase()
+                    audit.phase_transition(
+                        prev_phase.value,
+                        next_phase.value if next_phase else "completed",
+                        len(mission.findings),
+                    )
                     if next_phase is None:
                         logger.info("Tüm fazlar tamamlandı!")
                         break
@@ -215,11 +321,18 @@ class Orchestrator:
 
         except Exception as exc:
             logger.error("Operasyon hatası: %s", exc, exc_info=True)
+            audit.log("mission_error", success=False, detail={"error": str(exc)})
             mission.status = MissionStatus.ABORTED
 
         finally:
             self._running = False
             self._memory.save(mission.id)
+            audit.log("mission_completed", detail={
+                "status": mission.status.value,
+                "findings": len(mission.findings),
+                "duration_seconds": round(time.monotonic() - mission_start),
+            })
+            audit.close()
 
         logger.info("=" * 60)
         logger.info("OPERASYON TAMAMLANDI: %s", mission.status.value)
@@ -268,31 +381,39 @@ class Orchestrator:
             if agent_name:
                 task_map[agent_name] = task_desc
 
-        if parallel and len(agent_names) > 1:
-            coros = []
-            for name in agent_names:
-                agent = self._agents.get(name)
-                if not agent:
-                    logger.warning("Agent bulunamadı: %s (atlanıyor)", name)
-                    continue
-                task = task_map.get(
-                    name,
-                    "{} fazını çalıştır: {}".format(name, ", ".join(mission.target_scope)),
+        async def _run_single_agent(name: str) -> AgentResult:
+            agent = self._agents.get(name)
+            if not agent:
+                logger.warning("Agent bulunamadı: %s (atlanıyor)", name)
+                return AgentResult(
+                    agent_name=name, success=False,
+                    error="Agent bulunamadı: {}".format(name),
                 )
-                coros.append(agent.run(task, mission, self._memory))
-            if coros:
-                results = await asyncio.gather(*coros, return_exceptions=False)
+            task = task_map.get(
+                name,
+                "{} fazını çalıştır: {}".format(name, ", ".join(mission.target_scope)),
+            )
+            try:
+                return await _retry_async(
+                    lambda: agent.run(task, mission, self._memory),
+                    label=f"agent.{name}",
+                )
+            except Exception as exc:
+                logger.error("Agent %s başarısız (tüm retry'lar): %s", name, exc)
+                audit.log(
+                    "agent_failed", agent=name, success=False,
+                    detail={"error": str(exc)},
+                )
+                return AgentResult(
+                    agent_name=name, success=False, error=str(exc),
+                )
+
+        if parallel and len(agent_names) > 1:
+            coros = [_run_single_agent(name) for name in agent_names]
+            results = list(await asyncio.gather(*coros, return_exceptions=False))
         else:
             for name in agent_names:
-                agent = self._agents.get(name)
-                if not agent:
-                    logger.warning("Agent bulunamadı: %s (atlanıyor)", name)
-                    continue
-                task = task_map.get(
-                    name,
-                    "{} fazını çalıştır: {}".format(name, ", ".join(mission.target_scope)),
-                )
-                result = await agent.run(task, mission, self._memory)
+                result = await _run_single_agent(name)
                 results.append(result)
 
         return results
@@ -301,6 +422,7 @@ class Orchestrator:
 
     def stop(self) -> None:
         logger.warning("KILLSWITCH AKTİF — operasyon durduruluyor")
+        audit.log("killswitch")
         self._running = False
         if self._mission:
             self._mission.status = MissionStatus.PAUSED

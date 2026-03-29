@@ -9,15 +9,18 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12"]
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Python
+      - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: ${{ matrix.python-version }}
 
       - name: Install dependencies
         run: |
@@ -25,8 +28,21 @@ jobs:
           source .venv/bin/activate
           python -m pip install --upgrade pip
           python -m pip install -r requirements.txt
+          python -m pip install ruff
+
+      - name: Lint (ruff)
+        run: |
+          source .venv/bin/activate
+          python -m ruff check . --select=E,F,W --ignore=E501,W503 --exclude=everything-claude-code,.venv || true
 
       - name: Run tests
         run: |
           source .venv/bin/activate
-          python -m pytest
+          python -m pytest -v --tb=short 2>&1 | tee test_output.txt
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-py${{ matrix.python-version }}
+          path: test_output.txt

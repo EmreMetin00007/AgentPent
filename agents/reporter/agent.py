@@ -15,6 +15,7 @@ from agents.base_agent import AgentResult, BaseAgent
 from core.memory import ConversationMemory
 from core.mission import AttackPhase, Finding, Mission, Severity
 from core.report_generator import ReportGenerator, ReportData
+from core.utils import extract_json_from_llm
 
 logger = logging.getLogger("agentpent.agents.reporter")
 
@@ -41,7 +42,7 @@ class ReporterAgent(BaseAgent):
         tool_outputs: Dict[str, str] = {}
         next_actions: List[str] = []
 
-        parsed = self._extract_json(response)
+        parsed = extract_json_from_llm(response)
         if parsed:
             executive_summary = parsed.get("executive_summary", "")
             risk_rating = parsed.get("risk_rating", "")
@@ -91,13 +92,4 @@ class ReporterAgent(BaseAgent):
             executive_summary=executive_summary,
         )
 
-    @staticmethod
-    def _extract_json(text: str) -> Optional[Dict]:
-        try:
-            if "```json" in text:
-                return json.loads(text.split("```json")[1].split("```")[0].strip())
-            elif "```" in text:
-                return json.loads(text.split("```")[1].split("```")[0].strip())
-            return json.loads(text.strip())
-        except (json.JSONDecodeError, IndexError):
-            return None
+

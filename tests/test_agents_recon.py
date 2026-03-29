@@ -35,19 +35,22 @@ class TestReconAgent:
         assert ReconAgent._is_ip("256.1.1.1") is False
 
     def test_extract_json_from_codeblock(self):
+        from core.utils import extract_json_from_llm
         text = 'Some text\n```json\n{"findings": [{"title": "Test"}]}\n```\nMore text'
-        result = ReconAgent._extract_json(text)
+        result = extract_json_from_llm(text)
         assert result is not None
         assert result["findings"][0]["title"] == "Test"
 
     def test_extract_json_direct(self):
+        from core.utils import extract_json_from_llm
         text = '{"findings": [{"title": "Direct"}]}'
-        result = ReconAgent._extract_json(text)
+        result = extract_json_from_llm(text)
         assert result is not None
         assert result["findings"][0]["title"] == "Direct"
 
     def test_extract_json_invalid(self):
-        result = ReconAgent._extract_json("not json at all")
+        from core.utils import extract_json_from_llm
+        result = extract_json_from_llm("not json at all")
         assert result is None
 
     @pytest.mark.asyncio

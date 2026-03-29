@@ -1,18 +1,38 @@
 """AgentPent — Attack Graph Tools.
 
-Ajanların buldukları servis ve zafiyetleri grafik ağına (Graph) 
+Ajanların buldukları servis ve zafiyetleri grafik ağına (Graph)
 düğüm ve ilişki olarak eklemesini sağlar.
+
+Not: Global singleton yerine, per-mission grafik kullanır.
+Araç çağrıldığında en son oluşturulmuş mission'ın graph'ını kullanır.
 """
 
 from __future__ import annotations
 
 import logging
-from typing import Any, ClassVar, Dict
+from typing import Any, ClassVar, Dict, Optional
 
-from core.attack_graph import global_attack_graph
+from core.attack_graph import AttackGraph
 from tools.base_tool import BaseTool, ToolResult
 
 logger = logging.getLogger("agentpent.tools.graph")
+
+# Module-level graph: per-mission, orchestrator tarafından set edilir
+_active_graph: Optional[AttackGraph] = None
+
+
+def set_active_graph(graph: AttackGraph) -> None:
+    """Orchestrator tarafından mission başlatıldığında çağrılır."""
+    global _active_graph
+    _active_graph = graph
+
+
+def get_active_graph() -> AttackGraph:
+    """Aktif graph'ı döner, yoksa yeni boş bir tane oluşturur."""
+    global _active_graph
+    if _active_graph is None:
+        _active_graph = AttackGraph()
+    return _active_graph
 
 
 class GraphAddNodeTool(BaseTool):
@@ -33,16 +53,19 @@ class GraphAddNodeTool(BaseTool):
         if not node_id or not node_type:
             return ToolResult(tool_name=self.name, success=False, error="id ve type parametreleri gerekli.")
 
-        is_new = global_attack_graph.add_node(node_id, node_type, {})
-        
-        msg = f"Düğüm {'eklendi' if is_new else 'güncellendi'}: {node_id} ({node_type})"
+        graph = get_active_graph()
+        is_new = graph.add_node(node_id, node_type, {})
+
+        msg = "Düğüm {} {}: {} ({})".format(
+            "eklendi" if is_new else "güncellendi", graph.summary, node_id, node_type,
+        )
         logger.info("[GraphAddNodeTool] %s", msg)
 
         return ToolResult(
             tool_name=self.name,
-            command=f"add_node: {node_id}",
+            command="add_node: {}".format(node_id),
             success=True,
-            stdout=msg
+            stdout=msg,
         )
 
     def parse_output(self, raw: str) -> Dict[str, Any]:
@@ -67,21 +90,22 @@ class GraphAddEdgeTool(BaseTool):
         if not source_id or not target_id or not relation:
             return ToolResult(tool_name=self.name, success=False, error="source_id, target_id, relation gereklidir.")
 
-        added = global_attack_graph.add_edge(source_id, target_id, relation)
-        
+        graph = get_active_graph()
+        added = graph.add_edge(source_id, target_id, relation)
+
         if added:
-            msg = f"İlişki Eklendi: {source_id} -[{relation}]-> {target_id}"
+            msg = "İlişki Eklendi: {} -[{}]-> {}".format(source_id, relation, target_id)
         else:
-            msg = f"Başarısız: İlişki zaten var veya düğümlerden biri grafikte yok."
+            msg = "Başarısız: İlişki zaten var veya düğümlerden biri grafikte yok."
             return ToolResult(tool_name=self.name, success=False, error=msg)
 
         logger.info("[GraphAddEdgeTool] %s", msg)
 
         return ToolResult(
             tool_name=self.name,
-            command=f"add_edge: {source_id}->{target_id}",
+            command="add_edge: {}->{}".format(source_id, target_id),
             success=True,
-            stdout=msg
+            stdout=msg,
         )
 
     def parse_output(self, raw: str) -> Dict[str, Any]:
@@ -100,17 +124,18 @@ class GraphViewTool(BaseTool):
 
     async def _run(self, params: Dict[str, Any]) -> ToolResult:
         fmt = params.get("format", "mermaid")
-        
+        graph = get_active_graph()
+
         if fmt == "json":
-            out_str = global_attack_graph.to_json()
+            out_str = graph.to_json()
         else:
-            out_str = global_attack_graph.get_mermaid()
+            out_str = graph.get_mermaid()
 
         return ToolResult(
             tool_name=self.name,
-            command=f"view_graph:{fmt}",
+            command="view_graph:{}".format(fmt),
             success=True,
-            stdout=out_str
+            stdout=out_str,
         )
 
     def parse_output(self, raw: str) -> Dict[str, Any]:

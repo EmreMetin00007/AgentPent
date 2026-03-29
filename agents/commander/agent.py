@@ -13,6 +13,7 @@ from agents.base_agent import AgentResult, BaseAgent
 from core.llm_client import llm
 from core.memory import ConversationMemory
 from core.mission import AttackPhase, Mission
+from core.utils import extract_json_from_llm
 
 logger = logging.getLogger("agentpent.commander")
 
@@ -112,24 +113,18 @@ class CommanderAgent(BaseAgent):
         return self.PHASE_AGENTS.get(phase, {"agents": [], "parallel": False})
 
     def _parse_decision(self, raw: str) -> Dict:
-        try:
-            if "```json" in raw:
-                json_str = raw.split("```json")[1].split("```")[0].strip()
-            elif "```" in raw:
-                json_str = raw.split("```")[1].split("```")[0].strip()
-            else:
-                json_str = raw.strip()
-            return json.loads(json_str)
-        except (json.JSONDecodeError, IndexError):
-            logger.warning("Commander kararı parse edilemedi, ham yanıt kullanılıyor")
-            return {
-                "decision": "next_phase",
-                "target_agents": [],
-                "parallel": False,
-                "tasks": [],
-                "reasoning": raw[:500],
-                "notes": "",
-            }
+        result = extract_json_from_llm(raw)
+        if result:
+            return result
+        logger.warning("Commander kararı parse edilemedi, fallback kullanılıyor")
+        return {
+            "decision": "next_phase",
+            "target_agents": [],
+            "parallel": False,
+            "tasks": [],
+            "reasoning": raw[:500],
+            "notes": "",
+        }
 
     def _extract_actions(self, decision: Dict) -> List[str]:
         actions = []

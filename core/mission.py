@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -72,6 +72,8 @@ class Finding(BaseModel):
 class Mission(BaseModel):
     """Bir pentest görevini (engagement) temsil eder."""
 
+    model_config = {"arbitrary_types_allowed": True}
+
     id: str = Field(default_factory=lambda: uuid.uuid4().hex[:8])
     name: str = "Unnamed Mission"
     target_scope: List[str] = Field(default_factory=list)  # IP / domain / CIDR
@@ -82,6 +84,7 @@ class Mission(BaseModel):
     findings: List[Finding] = Field(default_factory=list)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    attack_graph: Any = Field(default=None, exclude=True)  # AttackGraph instance
     commander_notes: str = ""
 
     # ── Convenience ──────────────────────────────────────
@@ -89,6 +92,15 @@ class Mission(BaseModel):
     def add_finding(self, finding: Finding) -> None:
         self.findings.append(finding)
         self.updated_at = datetime.now(timezone.utc)
+        self._rebuild_graph()
+
+    def _rebuild_graph(self) -> None:
+        """Attack graph'ı mevcut finding'lerden yeniden oluştur."""
+        try:
+            from core.attack_graph import AttackGraph
+            self.attack_graph = AttackGraph.from_findings(self.findings)
+        except Exception:
+            pass  # Graph oluşturma opsiyonel
 
     def advance_phase(self) -> Optional[AttackPhase]:
         """Mevcut fazı tamamladı olarak işaretle ve bir sonraki faza geç."""

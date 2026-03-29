@@ -14,6 +14,7 @@ from agents.base_agent import AgentResult, BaseAgent
 from agents.recon.tools import setup_recon_tools
 from core.memory import ConversationMemory
 from core.mission import AttackPhase, Finding, Mission, Severity
+from core.utils import extract_json_from_llm
 
 logger = logging.getLogger("agentpent.agents.recon")
 
@@ -42,7 +43,7 @@ class ReconAgent(BaseAgent):
         next_actions: List[str] = []
 
         # JSON yanıtı parse et
-        parsed = self._extract_json(response)
+        parsed = extract_json_from_llm(response)
 
         if parsed:
             # Bulguları çıkar
@@ -142,17 +143,4 @@ class ReconAgent(BaseAgent):
             return all(p.isdigit() and 0 <= int(p) <= 255 for p in parts)
         return False
 
-    @staticmethod
-    def _extract_json(text: str) -> Optional[Dict]:
-        """LLM yanıtından JSON bloğunu çıkar."""
-        try:
-            if "```json" in text:
-                json_str = text.split("```json")[1].split("```")[0].strip()
-                return json.loads(json_str)
-            elif "```" in text:
-                json_str = text.split("```")[1].split("```")[0].strip()
-                return json.loads(json_str)
-            else:
-                return json.loads(text.strip())
-        except (json.JSONDecodeError, IndexError):
-            return None
+

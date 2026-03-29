@@ -13,6 +13,7 @@ from typing import Any, Dict, List, Optional
 from agents.base_agent import AgentResult, BaseAgent
 from core.memory import ConversationMemory
 from core.mission import AttackPhase, Finding, Mission, Severity
+from core.utils import extract_json_from_llm
 
 logger = logging.getLogger("agentpent.agents.evasion")
 
@@ -39,7 +40,7 @@ class EvasionAgent(BaseAgent):
         tool_outputs: Dict[str, str] = {}
         next_actions: List[str] = []
 
-        parsed = self._extract_json(response)
+        parsed = extract_json_from_llm(response)
         if parsed:
             for f_data in parsed.get("findings", []):
                 try:
@@ -73,13 +74,4 @@ class EvasionAgent(BaseAgent):
             success=True,
         )
 
-    @staticmethod
-    def _extract_json(text: str) -> Optional[Dict]:
-        try:
-            if "```json" in text:
-                return json.loads(text.split("```json")[1].split("```")[0].strip())
-            elif "```" in text:
-                return json.loads(text.split("```")[1].split("```")[0].strip())
-            return json.loads(text.strip())
-        except (json.JSONDecodeError, IndexError):
-            return None
+

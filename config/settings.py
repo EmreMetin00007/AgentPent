@@ -41,6 +41,18 @@ class Settings(BaseSettings):
         default="qwen/qwen3-max-thinking",
         description="Model used for deep reasoning / thinker tasks",
     )
+    offensive_model: str = Field(
+        default="nousresearch/hermes-3-llama-3.1-405b",
+        description="Uncensored model for exploit/evasion/post-exploit agents",
+    )
+    fallback_models: str = Field(
+        default="nousresearch/hermes-3-llama-3.1-405b,cognitivecomputations/dolphin3.0-r1-mistral-24b",
+        description="Comma-separated fallback model chain (tried on refusal)",
+    )
+    enable_fallback_chain: bool = Field(
+        default=True,
+        description="Enable automatic model fallback on refusal detection",
+    )
     temperature: float = Field(default=0.2, ge=0.0, le=2.0)
     max_tokens: int = Field(default=4096, gt=0)
 
@@ -61,8 +73,25 @@ class Settings(BaseSettings):
     )
     max_concurrent_tools: int = Field(default=5, ge=1)
     rate_limit_rps: float = Field(
-        default=10.0,
+        default=3.0,
         description="Max requests-per-second to any single target",
+    )
+    rate_limit_jitter_min: float = Field(
+        default=0.1,
+        description="Minimum random delay (seconds) between requests",
+    )
+    rate_limit_jitter_max: float = Field(
+        default=0.8,
+        description="Maximum random delay (seconds) between requests — IDS evasion",
+    )
+    max_react_iterations: int = Field(
+        default=20,
+        ge=1,
+        description="Maximum ReAct loop iterations per agent run",
+    )
+    mission_timeout_seconds: int = Field(
+        default=1800,
+        description="Maximum total mission runtime in seconds (30 min)",
     )
 
     # Logging
