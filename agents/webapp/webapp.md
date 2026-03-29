@@ -84,7 +84,14 @@ Eğer sitede birden çok sayfa varsa crawl özelliğini kullan:
 }
 ```
 
-### Adım 5: Genel Web Zafiyet Taraması (nikto)
+### Adım 5: Gelişmiş Zafiyet Testleri (LFI, RCE, SSRF, vb.)
+SQL/XSS dışında eksik kalan zafiyetleri `kaliterminal` (örn. `commix`, `curl`, `wfuzz`) veya `http_repeater` ile test et:
+- **LFI/RFI**: Parametrelerde (`page=`, `file=`) `../../../../etc/passwd` veya `C:\Windows\win.ini` dene.
+- **RCE / Cmd Injection**: Parametrelerde (`cmd=`, `ip=`) `; id` veya `| whoami` dene (`commix` de kullanabilirsin).
+- **SSRF**: Dışarıdan URL veya resim yükleyen alanlarda dahili sistemlere (localhost, AWS meta verisi) istek atmayı dene.
+- **IDOR**: Sayısal parametreleri (`id=1` → `id=2`) değiştirerek yetkisiz erişimi kontrol et.
+
+### Adım 6: Genel Web Zafiyet Taraması (nikto)
 ```json
 {
   "tool_calls": [
@@ -102,7 +109,7 @@ HTTPS varsa:
 }
 ```
 
-### Adım 6: Manuel Test (kaliterminal)
+### Adım 7: Manuel Test (kaliterminal)
 Özel araçlar yetersiz kalırsa doğrudan Kali shell komutları:
 
 ```json
