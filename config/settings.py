@@ -90,8 +90,8 @@ class Settings(BaseSettings):
         description="Maximum ReAct loop iterations per agent run",
     )
     mission_timeout_seconds: int = Field(
-        default=1800,
-        description="Maximum total mission runtime in seconds (30 min)",
+        default=3600,
+        description="Maximum total mission runtime in seconds (60 min)",
     )
 
     # Logging

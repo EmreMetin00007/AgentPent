@@ -18,12 +18,12 @@ logger = logging.getLogger("agentpent.tools.nmap")
 # ── Tarama Profilleri ────────────────────────────────────
 
 SCAN_PROFILES: Dict[str, List[str]] = {
-    "quick": ["-T4", "-F", "--open"],
-    "full": ["-T4", "-p-", "-sV", "--open"],
-    "service": ["-sV", "-sC", "--open"],
-    "vuln": ["-sV", "--script=vuln", "--open"],
-    "stealth": ["-sS", "-T2", "--open"],
-    "udp": ["-sU", "-T4", "--top-ports", "100", "--open"],
+    "quick": ["-Pn", "-T4", "-F", "--open"],
+    "full": ["-Pn", "-T4", "--top-ports", "5000", "-sV", "--open"],
+    "service": ["-Pn", "-sV", "-sC", "--open"],
+    "vuln": ["-Pn", "-sV", "--script=vuln", "--open"],
+    "stealth": ["-Pn", "-sS", "-T3", "--open"],
+    "udp": ["-Pn", "-sU", "-T4", "--top-ports", "50", "--open"],
 }
 
 
@@ -39,7 +39,7 @@ class NmapTool(BaseTool):
         scan_type = params.get("scan_type", "quick")
         ports = params.get("ports")
         extra_flags: List[str] = params.get("extra_flags", [])
-        timeout = params.get("timeout", 600)
+        timeout = params.get("timeout", 180)  # 3 dakika — T4 ile yeterli
 
         # Komut oluştur
         args = [self.binary]
