@@ -54,7 +54,7 @@ class Settings(BaseSettings):
         description="Enable automatic model fallback on refusal detection",
     )
     temperature: float = Field(default=0.2, ge=0.0, le=2.0)
-    max_tokens: int = Field(default=4096, gt=0)
+    max_tokens: int = Field(default=2048, gt=0)
 
     # Database
     db_path: str = Field(

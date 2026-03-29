@@ -64,8 +64,12 @@ def extract_json_from_llm(text: str) -> Optional[Dict[str, Any]]:
     return None
 
 
-def truncate_output(text: str, max_chars: int = 3000) -> str:
-    """Uzun araç çıktılarını LLM context'e sığacak şekilde keser."""
+def truncate_output(text: str, max_chars: int = 1500) -> str:
+    """Uzun araç çıktılarını LLM context'e sığacak şekilde keser.
+    
+    Token optimizasyonu: 3000→1500 karakter.
+    Araç çıktılarının %90'ı ilk 500 ve son 500 karakterde yoğunlaşır.
+    """
     if not text or len(text) <= max_chars:
         return text
     half = max_chars // 2

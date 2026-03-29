@@ -165,9 +165,14 @@ class BaseAgent(ABC):
             )
             llm_duration = (time.monotonic() - llm_start) * 1000
 
+            # Token tahmini — izleme için (~4 char = 1 token)
+            est_prompt_tokens = sum(len(m.get("content", "")) for m in messages) // 4
+            est_prompt_tokens += len(enhanced_prompt) // 4
+
             audit.llm_call(
                 agent=self.name,
                 model=effective_model,
+                prompt_tokens=est_prompt_tokens,
                 duration_ms=llm_duration,
             )
 
@@ -221,7 +226,7 @@ class BaseAgent(ABC):
                         else:
                             result_text = f"[HATA] {result.error or 'Bilinmeyen hata'}"
 
-                        all_tool_outputs[f"{tool_name}_{iteration}"] = result_text[:1000]
+                        all_tool_outputs[f"{tool_name}_{iteration}"] = result_text[:500]
 
                     except Exception as exc:
                         result_text = f"[EXCEPTION] {tool_name}: {exc}"
@@ -231,8 +236,8 @@ class BaseAgent(ABC):
 
             # Araç sonuçlarını mesajlara ekle
             combined = "\n\n".join(tool_results_text)
-            messages.append({"role": "user", "content": f"## Araç Sonuçları (İterasyon {iteration})\n\n{combined}"})
-            memory.add_tool_result(combined[:2000], agent=self.name, phase=self.phase.value)
+            messages.append({"role": "user", "content": f"## Araç Sonuçları ({iteration})\n\n{combined}"})
+            memory.add_tool_result(combined[:1000], agent=self.name, phase=self.phase.value)
 
         else:
             logger.warning("[%s] ReAct max iterasyon aşıldı (%d)", self.name, max_iter)
@@ -254,21 +259,22 @@ class BaseAgent(ABC):
         return result
 
     def _build_context(self, mission: Mission, extra: str = "") -> str:
+        """Token-optimize edilmiş mission bağlamı."""
         parts = [
-            "## Mission Bilgileri",
-            "- ID: {}".format(mission.id),
-            "- Ad: {}".format(mission.name),
-            "- Hedefler: {}".format(", ".join(mission.target_scope)),
-            "- Mevcut Faz: {}".format(mission.current_phase.value),
-            "- Tamamlanan Fazlar: {}".format(
-                ", ".join(p.value for p in mission.phases_completed)
+            "## Mission",
+            "Hedef: {} | Faz: {} | Bulgular: {}".format(
+                ", ".join(mission.target_scope),
+                mission.current_phase.value,
+                mission.stats,
             ),
-            "- Mevcut Bulgular: {}".format(mission.stats),
         ]
         if mission.commander_notes:
-            parts.append("\n## Commander Notları\n{}".format(mission.commander_notes))
+            # Sadece son 300 karakter
+            notes = mission.commander_notes[-300:]
+            parts.append("Commander: {}".format(notes))
         if extra:
-            parts.append("\n## Ek Bağlam\n{}".format(extra))
+            # Extra context'i de kısalt
+            parts.append(extra[:500])
         return "\n".join(parts)
 
     @abstractmethod
