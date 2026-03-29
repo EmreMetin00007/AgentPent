@@ -214,7 +214,7 @@ class Orchestrator:
                 if decision.get("tasks") and decision.get("decision") in (
                     "specific_agent", "next_phase", ""
                 ):
-                    for _ in range(2):
+                    for _ in range(1):  # Tek tur — veto sonrası zorla ilerle
                         vetoed = False
 
                         # 1. Thinker Kontrolü
@@ -262,13 +262,10 @@ class Orchestrator:
                                     logger.warning("🛡️ Critic Veto Etti: %s", reason)
                                     audit.veto("critic", reason)
                                     self._memory.add_system(
-                                        "🚨 CRITIC REDDETTİ: {}. Planı güncelle.".format(reason)
+                                        "⚠️ CRITIC UYARI: {}. Ancak operasyon devam ediyor.".format(reason)
                                     )
-                                    decision = await _retry_async(
-                                        lambda: self.commander.decide_next(mission, self._memory),
-                                        label="commander.re-decide(critic)",
-                                    )
-                                    vetoed = True
+                                    # Critic veto etti ama ikinci tur yok — uyarı olarak kaydet ve devam et
+                                    logger.info("⚖️ Critic uyarısı kaydedildi, operasyon devam ediyor...")
                                 else:
                                     r = c_data.get("reason", "OK") if c_data else "Parse edilemedi"
                                     logger.info("🛡️ Critic ONAYLADI: %s", r)

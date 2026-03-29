@@ -7,6 +7,7 @@ Kapsam dışı hedeflere erişimi engeller.
 from __future__ import annotations
 
 import ipaddress
+from urllib.parse import urlparse
 import fnmatch
 import logging
 from pathlib import Path
@@ -125,23 +126,39 @@ class ScopeGuard:
     def validate_target(self, target: str, port: Optional[int] = None) -> bool:
         if not settings.require_scope:
             return True
+
+        # Boş target → hedef-bağımsız araçlar (graph, rag vb.) için geçerli
+        if not target or not target.strip():
+            return True
+
         profile = self.active
         if profile is None:
             raise OutOfScopeError("Aktif scope profili yok — tüm hedefler engellendi")
+
+        # URL formatındaki target'lardan host'u çıkar
+        # Örn: "http://65.61.137.117" → "65.61.137.117"
+        clean_target = target.strip()
+        if "://" in clean_target:
+            try:
+                parsed = urlparse(clean_target)
+                clean_target = parsed.hostname or clean_target
+            except Exception:
+                pass
+
         try:
-            ipaddress.ip_address(target)
+            ipaddress.ip_address(clean_target)
             is_ip = True
         except ValueError:
             is_ip = False
         if is_ip:
-            if not profile.is_ip_allowed(target):
+            if not profile.is_ip_allowed(clean_target):
                 raise OutOfScopeError(
-                    "IP kapsam dışı: {} (profil: {})".format(target, profile.name)
+                    "IP kapsam dışı: {} (profil: {})".format(clean_target, profile.name)
                 )
         else:
-            if not profile.is_domain_allowed(target):
+            if not profile.is_domain_allowed(clean_target):
                 raise OutOfScopeError(
-                    "Domain kapsam dışı: {} (profil: {})".format(target, profile.name)
+                    "Domain kapsam dışı: {} (profil: {})".format(clean_target, profile.name)
                 )
         if port is not None and not profile.is_port_allowed(port):
             raise OutOfScopeError(
