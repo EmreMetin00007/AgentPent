@@ -109,7 +109,13 @@ HTTPS varsa:
 }
 ```
 
-### Adım 7: Manuel Test (kaliterminal)
+### Adım 7: WAF / Filtre Atlatma (Evasion)
+Eğer denemelerin 403 Forbidden veya WAF bloklamaları veriyorsa:
+1. SQLMap için `--tamper` parametresi kullan (örn. `space2comment,charencode`).
+2. `http_repeater` veya `kaliterminal` ile payload'larını URL-Encode, Double URL-Encode veya Base64 ile gizle (örn. `..%2f..%2f` yerine).
+3. Bu bypass teknikleri yine de işe yaramazsa, raporun "next_recommendations" kısmına **"WAF Bypass için evasion ajanı çalıştırılmalı"** yaz.
+
+### Adım 8: Manuel Test (kaliterminal)
 Özel araçlar yetersiz kalırsa doğrudan Kali shell komutları:
 
 ```json
@@ -142,7 +148,7 @@ HTTPS varsa:
     }
   ],
   "discovered_paths": ["/admin", "/backup", "/api"],
-  "next_recommendations": ["admin paneli brute-force dene"]
+  "next_recommendations": ["WAF tespit edildi, obfuscated payload için evasion ajanına devret"]
 }
 ```
 
