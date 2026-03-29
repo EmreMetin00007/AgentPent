@@ -96,7 +96,8 @@ class CommanderAgent(BaseAgent):
 
         task = (
             "Mevcut pentest operasyonunun durumunu analiz et ve "
-            "sonraki adıma karar ver. JSON formatında yanıt döndür: "
+            "sonraki adıma karar ver. SADECE VE SADECE JSON formatında "
+            "yanıt döndür. Markdown açıklaması yapma. JSON şablonu: \n"
             '{"decision": "...", "target_agents": [...], "parallel": bool, '
             '"tasks": [...], "reasoning": "...", "notes": "..."}'
         )

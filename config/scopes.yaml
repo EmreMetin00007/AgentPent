@@ -19,6 +19,7 @@ profiles:
       - "172.16.0.0/12"
       - "192.168.0.0/16"
       - "127.0.0.0/8"
+      - "65.61.137.117/32"
 
     # İzin verilen domain'ler (wildcard destekler)
     allowed_domains:
