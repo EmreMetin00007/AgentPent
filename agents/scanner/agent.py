@@ -100,12 +100,21 @@ class ScannerAgent(BaseAgent):
 
                 # Servis versiyon detayı
                 if nm_result.success:
+                    open_ports: List[str] = []
+                    for host in nm_result.parsed_data.get("hosts", []):
+                        for port_info in host.get("ports", []):
+                            if port_info.get("state") == "open":
+                                open_ports.append(str(port_info.get("port")))
+                    open_ports = list(dict.fromkeys(open_ports))
+
                     logger.info("[scanner] Nmap service scan: %s", target)
-                    svc_result = await nmap.execute({
-                        "target": target,
-                        "scan_type": "service",
-                    })
-                    target_results["nmap_service"] = svc_result.parsed_data
+                    if open_ports:
+                        svc_result = await nmap.execute({
+                            "target": target,
+                            "scan_type": "service",
+                            "ports": ",".join(open_ports),
+                        })
+                        target_results["nmap_service"] = svc_result.parsed_data
 
             # 2. Nuclei — vulnerability scan
             nuclei = self.get_tool("nuclei")
@@ -129,5 +138,4 @@ class ScannerAgent(BaseAgent):
             results[target] = target_results
 
         return results
-
 

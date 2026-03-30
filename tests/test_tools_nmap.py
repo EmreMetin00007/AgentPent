@@ -136,3 +136,50 @@ class TestNmapTool:
         assert result.success
         # Komutta -p parametresi olmalı
         assert "-p" in result.command
+
+    @pytest.mark.asyncio
+    @patch("tools.base_tool.scope_guard")
+    async def test_service_scan_requires_explicit_ports(self, mock_scope):
+        mock_scope.validate_target = MagicMock(return_value=True)
+        self.tool.is_available = AsyncMock(return_value=True)
+
+        result = await self.tool.execute({
+            "target": "10.10.10.5",
+            "scan_type": "service",
+        })
+
+        assert not result.success
+        assert "explicit ports" in result.error
+
+    @pytest.mark.asyncio
+    @patch("tools.base_tool.scope_guard")
+    async def test_protected_scan_rejects_full_range_ports(self, mock_scope):
+        mock_scope.validate_target = MagicMock(return_value=True)
+        self.tool.is_available = AsyncMock(return_value=True)
+
+        result = await self.tool.execute({
+            "target": "10.10.10.5",
+            "scan_type": "quick",
+            "ports": "1-65535",
+        })
+
+        assert not result.success
+        assert "tam port aralığı" in result.error
+
+    @pytest.mark.asyncio
+    @patch("tools.base_tool.scope_guard")
+    @patch("asyncio.create_subprocess_exec")
+    async def test_protected_scan_sanitizes_unsafe_extra_flags(self, mock_exec, mock_scope):
+        mock_scope.validate_target = MagicMock(return_value=True)
+        mock_exec.return_value = _make_proc_mock(NMAP_XML_OUTPUT)
+
+        result = await self.tool.execute({
+            "target": "10.10.10.5",
+            "scan_type": "quick",
+            "extra_flags": ["-O", "--script=vuln", "--script-trace"],
+        })
+
+        assert result.success
+        assert "-O" not in result.command
+        assert "--script=vuln" not in result.command
+        assert "--script-trace" not in result.command

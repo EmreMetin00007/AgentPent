@@ -5,6 +5,7 @@ from __future__ import annotations
 from typer.testing import CliRunner
 
 from cli import main as cli_main
+from core.mission import AttackPhase, Finding, Mission, MissionStatus, Severity
 
 
 runner = CliRunner()
@@ -68,3 +69,36 @@ def test_agents_command_ascii_fallback(monkeypatch):
     assert result.exit_code == 0
     assert "Registered Agents" in result.stdout
     assert "commander" in result.stdout
+
+
+def test_mission_single_phase_summary_uses_completed_status(monkeypatch):
+    class FakeOrchestrator:
+        def create_mission(self, name, targets, scope_profile="default"):
+            return Mission(name=name, target_scope=targets, scope_profile=scope_profile)
+
+        async def run_single_phase(self, phase, mission_obj):
+            assert phase == AttackPhase.RECONNAISSANCE
+            mission_obj.status = MissionStatus.COMPLETED
+            mission_obj.add_finding(Finding(
+                title="Smoke finding",
+                severity=Severity.INFO,
+                target=mission_obj.target_scope[0],
+                agent_source="recon",
+                phase=phase,
+            ))
+            return []
+
+    monkeypatch.setattr(cli_main, "UNICODE_OUTPUT", False)
+    monkeypatch.setattr(cli_main, "Orchestrator", FakeOrchestrator)
+
+    result = runner.invoke(cli_main.app, [
+        "mission",
+        "--name", "Smoke",
+        "--target", "127.0.0.1",
+        "--phase", "reconnaissance",
+    ])
+
+    assert result.exit_code == 0
+    assert "Status: COMPLETED" in result.stdout
+    assert "Total findings: 1" in result.stdout
+    assert "Status: PLANNING" not in result.stdout

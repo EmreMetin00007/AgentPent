@@ -122,6 +122,25 @@ class TestSQLMapTool:
         assert result.success
         assert result.parsed_data["injectable"] is True
 
+    @pytest.mark.asyncio
+    @patch("tools.base_tool.scope_guard")
+    async def test_default_timeout_is_180_seconds(self, mock_scope):
+        mock_scope.validate_target = MagicMock(return_value=True)
+        self.tool.is_available = AsyncMock(return_value=True)
+
+        async def _fake_run_command(args, *, timeout=300, cwd=None):
+            from tools.base_tool import ToolResult
+
+            return ToolResult(tool_name="sqlmap", success=True)
+
+        self.tool.run_command = AsyncMock(side_effect=_fake_run_command)
+
+        await self.tool.execute({
+            "target": "http://10.10.10.5/item.php?id=1",
+        })
+
+        assert self.tool.run_command.await_args.kwargs["timeout"] == 180
+
 
 class TestFFUFTool:
 

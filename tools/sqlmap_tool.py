@@ -34,7 +34,7 @@ class SQLMapTool(BaseTool):
         dbs = params.get("dbs", False)
         tables = params.get("tables")
         dump = params.get("dump", False)
-        timeout = params.get("timeout", 600)
+        timeout = params.get("timeout", 180)
         extra_flags: List[str] = params.get("extra_flags", [])
 
         # Geçici çıktı dizini

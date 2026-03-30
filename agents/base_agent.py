@@ -6,6 +6,7 @@ ReAct (Reason + Act) loop ile araçları otonom çağırabilir.
 
 from __future__ import annotations
 
+import json
 import logging
 import time
 from abc import ABC, abstractmethod
@@ -97,6 +98,16 @@ class BaseAgent(ABC):
     def available_tools(self) -> List[str]:
         return list(self._tools.keys())
 
+    @staticmethod
+    def _normalize_tool_calls(tool_calls: List[Dict[str, Any]]) -> str:
+        normalized = []
+        for tool_call in tool_calls:
+            normalized.append({
+                "tool": tool_call.get("tool", ""),
+                "params": tool_call.get("params", {}),
+            })
+        return json.dumps(normalized, ensure_ascii=False, sort_keys=True)
+
     # ── ReAct Loop ───────────────────────────────────────
 
     async def run(
@@ -120,6 +131,8 @@ class BaseAgent(ABC):
         max_iter = settings.max_react_iterations
         iteration = 0
         all_tool_outputs: Dict[str, str] = {}
+        previous_tool_signature: Optional[str] = None
+        repeat_warning_sent = False
 
         # Model seçimi — offensive agent'lar uncensored model kullanır
         effective_model = get_model_for_agent(
@@ -183,6 +196,7 @@ class BaseAgent(ABC):
                 tool_calls = parsed["tool_calls"]
 
             if not tool_calls:
+                repeat_warning_sent = False
                 # LLM araç çağırmadı → son yanıt
                 # KRİTİK DÜZELTME: Ajan ilk iterasyonda doğrudan final JSON dönmeye çalışırsa engelle!
                 if iteration == 1 and self.name not in ["commander", "thinker", "critic", "reporter"]:
@@ -194,6 +208,33 @@ class BaseAgent(ABC):
                 else:
                     logger.debug("[%s] ReAct tamamlandı (iterasyon %d) — son yanıt", self.name, iteration)
                     break
+
+            tool_signature = self._normalize_tool_calls(tool_calls)
+            if tool_signature == previous_tool_signature:
+                if repeat_warning_sent:
+                    logger.warning(
+                        "[%s] Aynı tool_calls uyarı sonrası tekrarlandı. Mevcut kanıtlarla döngü sonlandırılıyor.",
+                        self.name,
+                    )
+                    break
+
+                logger.warning(
+                    "[%s] Aynı tool_calls tekrarlandı. Araçlar yeniden çalıştırılmadan final yanıt isteniyor.",
+                    self.name,
+                )
+                messages.append({"role": "assistant", "content": response})
+                messages.append({
+                    "role": "user",
+                    "content": (
+                        "AYNI tool_calls tekrarlandı. Bu araçları yeniden çalıştırma. "
+                        "Mevcut araç çıktılarıyla final yanıtını üret veya yalnızca gerçekten yeni ve gerekli bir araç çağrısı yap."
+                    ),
+                })
+                repeat_warning_sent = True
+                continue
+
+            previous_tool_signature = tool_signature
+            repeat_warning_sent = False
 
             # Tool call'ları çalıştır
             messages.append({"role": "assistant", "content": response})

@@ -354,11 +354,30 @@ class Orchestrator:
         if not mission:
             raise ValueError("Aktif mission yok")
         mission.current_phase = phase
+        mission.status = MissionStatus.ACTIVE
+        self._running = True
         phase_config = self.commander.get_phase_agents(phase)
         agents = phase_config.get("agents", [])
-        return await self._run_agents(
-            agents, [], mission, parallel=phase_config.get("parallel", False)
-        )
+
+        try:
+            results = await self._run_agents(
+                agents, [], mission, parallel=phase_config.get("parallel", False)
+            )
+            for result in results:
+                for finding in result.findings:
+                    mission.add_finding(finding)
+
+            if phase not in mission.phases_completed:
+                mission.phases_completed.append(phase)
+            mission.status = MissionStatus.COMPLETED
+            return results
+        except Exception as exc:
+            logger.error("Tek faz operasyon hatası: %s", exc, exc_info=True)
+            audit.log("mission_error", success=False, detail={"error": str(exc)})
+            mission.status = MissionStatus.ABORTED
+            return []
+        finally:
+            self._running = False
 
     # ── Agent Çalıştırma ─────────────────────────────────
 

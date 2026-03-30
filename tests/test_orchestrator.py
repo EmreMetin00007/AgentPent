@@ -12,6 +12,7 @@ from agents.base_agent import AgentResult, BaseAgent
 from core.memory import ConversationMemory
 from core.mission import AttackPhase, Finding, Mission, MissionStatus, Severity
 from core.utils import extract_json_from_llm
+from tools.base_tool import ToolResult
 
 
 # ── extract_json_from_llm Tests ─────────────────────────
@@ -101,6 +102,34 @@ class TestOrchestrator:
         agents = orch.registered_agents
         assert isinstance(agents, list)
 
+    @pytest.mark.asyncio
+    async def test_run_single_phase_updates_mission_state_and_findings(self):
+        from core.orchestrator import Orchestrator
+
+        finding = Finding(
+            title="Open proxy detected",
+            severity=Severity.INFO,
+            target="10.0.0.5",
+            port=3128,
+            agent_source="scanner",
+            phase=AttackPhase.SCANNING,
+        )
+
+        orch = Orchestrator()
+        mission = Mission(name="Smoke", target_scope=["10.0.0.5"])
+        orch._mission = mission
+        orch._run_agents = AsyncMock(return_value=[
+            AgentResult(agent_name="scanner", findings=[finding]),
+        ])
+
+        results = await orch.run_single_phase(AttackPhase.SCANNING, mission)
+
+        assert len(results) == 1
+        assert mission.status == MissionStatus.COMPLETED
+        assert mission.current_phase == AttackPhase.SCANNING
+        assert mission.findings == [finding]
+        assert mission.phases_completed == [AttackPhase.SCANNING]
+
 
 # ── AgentResult Tests ───────────────────────────────────
 
@@ -145,3 +174,67 @@ class TestRetry:
 
         with pytest.raises(RuntimeError, match="permanent error"):
             await _retry_async(always_fail, max_retries=2, label="test")
+
+
+class _DummyRepeatAgent(BaseAgent):
+    name = "dummy_repeat"
+    description = "repeat guard regression"
+    phase = AttackPhase.RECONNAISSANCE
+
+    async def process_response(
+        self,
+        response: str,
+        mission: Mission,
+        memory: ConversationMemory,
+    ) -> AgentResult:
+        return AgentResult(
+            agent_name=self.name,
+            raw_response=response,
+            findings=[],
+            tool_outputs={},
+            next_actions=[],
+            success=True,
+        )
+
+
+class TestBaseAgentLoop:
+    @pytest.mark.asyncio
+    async def test_repeated_tool_calls_execute_once_and_exit_early(self, monkeypatch):
+        agent = _DummyRepeatAgent()
+        fake_tool = AsyncMock()
+        fake_tool.execute = AsyncMock(return_value=ToolResult(
+            tool_name="nmap",
+            stdout="ok",
+            success=True,
+        ))
+        agent.register_tool("nmap", fake_tool)
+
+        mission = Mission(name="Loop", target_scope=["10.10.10.5"])
+        memory = ConversationMemory()
+
+        repeated_response = json.dumps({
+            "tool_calls": [
+                {
+                    "tool": "nmap",
+                    "params": {
+                        "target": "10.10.10.5",
+                        "scan_type": "quick",
+                    },
+                }
+            ]
+        })
+        llm_mock = AsyncMock(side_effect=[
+            repeated_response,
+            repeated_response,
+            repeated_response,
+        ])
+
+        monkeypatch.setattr("agents.base_agent.llm.chat_with_fallback", llm_mock)
+        monkeypatch.setattr("agents.base_agent.settings.max_react_iterations", 5)
+
+        result = await agent.run("repeat test", mission, memory)
+
+        assert fake_tool.execute.await_count == 1
+        assert llm_mock.await_count == 3
+        assert result.tool_outputs["nmap_1"] == "ok"
+        assert result.tool_outputs["_react_iterations"] == "3"

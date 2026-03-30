@@ -105,7 +105,7 @@ TOOL_PARAM_SCHEMAS: Dict[str, str] = {
     "ffuf": "target (str URL+FUZZ, ZORUNLU — ör: http://IP/FUZZ), wordlist (str, varsayılan: /usr/share/wordlists/dirb/common.txt), mode (str: dir|vhost|param), extensions (str: '.php,.html'), filter_status (str: '404'), threads (int)",
     "xsstrike": "target (str URL+parametre, ZORUNLU — ör: http://IP/page?q=test), crawl (bool), data (str: POST body)",
     "nikto": "target (str URL, ZORUNLU — ör: http://IP), port (int), ssl (bool), tuning (str)",
-    "browser_vision": "target (str URL, ZORUNLU)",
+    "browser_vision": "url (str URL, ZORUNLU)",
     "http_repeater": "url (str, ZORUNLU), method (str: GET|POST|PUT), headers (dict), data (str: body), timeout (int)",
     "kaliterminal": "command (str, ZORUNLU — tam shell komutu)",
     "whois": "target (str IP/domain, ZORUNLU)",
@@ -114,10 +114,10 @@ TOOL_PARAM_SCHEMAS: Dict[str, str] = {
     "graph_add_edge": "source (str, ZORUNLU), target (str, ZORUNLU), relation (str)",
     "graph_view": "(parametre gerekmez)",
     "rag_search": "query (str, ZORUNLU)",
-    "rag_store": "key (str, ZORUNLU), value (str, ZORUNLU)",
+    "rag_store": "topic (str, ZORUNLU), payload (str, ZORUNLU), context (str, opsiyonel)",
     "linpeas": "target (str, ZORUNLU)",
     "metasploit": "target (str, ZORUNLU), module (str), payload (str), options (dict)",
-    "exploit_builder": "target (str, ZORUNLU), vuln_id (str), exploit_type (str)",
+    "exploit_builder": "action (str: generate|upload|verify|cleanup|list_templates|full_chain, ZORUNLU), generate için template/code/language/filename/lhost/lport, upload için payload_path/upload_url/field_name/extra_fields, verify için verify_url/verify_param/verify_command",
 }
 
 
@@ -146,4 +146,3 @@ def build_tool_definitions(tools: Dict[str, Any]) -> str:
             lines.append(f"- **{name}**: {desc}")
 
     return "\n".join(lines)
-

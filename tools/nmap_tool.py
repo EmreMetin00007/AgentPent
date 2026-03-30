@@ -26,6 +26,13 @@ SCAN_PROFILES: Dict[str, List[str]] = {
     "udp": ["-Pn", "-sU", "-T4", "--top-ports", "50", "--open"],
 }
 
+PROTECTED_SCAN_TYPES = {"quick", "service", "vuln"}
+
+
+def _is_full_range_ports(value: str) -> bool:
+    normalized = value.replace(" ", "")
+    return normalized in {"1-65535", "1-65534", "1-65536"}
+
 
 class NmapTool(BaseTool):
     """Nmap port/servis tarama wrapper'ı."""
@@ -34,12 +41,67 @@ class NmapTool(BaseTool):
     binary = "nmap"
     description = "Port ve servis tarama aracı"
 
+    @staticmethod
+    def _sanitize_extra_flags(scan_type: str, extra_flags: List[str]) -> List[str]:
+        sanitized: List[str] = []
+        idx = 0
+
+        while idx < len(extra_flags):
+            flag = str(extra_flags[idx]).strip()
+            if not flag:
+                idx += 1
+                continue
+
+            if scan_type in PROTECTED_SCAN_TYPES:
+                if flag in {"-O", "--osscan-guess", "-p-", "--script-trace"}:
+                    idx += 1
+                    continue
+
+                if flag in {"-p", "--top-ports", "--script"}:
+                    idx += 2 if idx + 1 < len(extra_flags) else 1
+                    continue
+
+                if flag.startswith("--script="):
+                    idx += 1
+                    continue
+
+                if flag.startswith("-p") and _is_full_range_ports(flag[2:]):
+                    raise ValueError("Korunan scan tiplerinde tam port aralığı override edilemez")
+
+            sanitized.append(flag)
+            idx += 1
+
+        return sanitized
+
     async def _run(self, params: Dict[str, Any]) -> ToolResult:
         target = params["target"]
         scan_type = params.get("scan_type", "quick")
         ports = params.get("ports")
         extra_flags: List[str] = params.get("extra_flags", [])
         timeout = params.get("timeout", 180)  # 3 dakika — T4 ile yeterli
+
+        if scan_type in {"service", "vuln"} and not ports:
+            return ToolResult(
+                tool_name=self.name,
+                success=False,
+                error="'service' ve 'vuln' scan_type için explicit ports gerekli.",
+            )
+
+        if scan_type in PROTECTED_SCAN_TYPES and ports and _is_full_range_ports(str(ports)):
+            return ToolResult(
+                tool_name=self.name,
+                success=False,
+                error="Korunan scan tiplerinde tam port aralığı kullanılamaz.",
+            )
+
+        try:
+            extra_flags = self._sanitize_extra_flags(scan_type, extra_flags)
+        except ValueError as exc:
+            return ToolResult(
+                tool_name=self.name,
+                success=False,
+                error=str(exc),
+            )
 
         # Komut oluştur
         args = [self.binary]

@@ -25,7 +25,7 @@ class KaliTerminalTool(BaseTool):
         "durumlarda doğrudan Kali Linux kabuğu üzerinden komut (ör. wfuzz, smbclient, awk) yürütür."
     )
 
-    timeout: int = 300  # 5 dakika — nmap service scan gibi uzun işler için
+    timeout: int = 120  # Smoke testlerde kilitlenmeyi önlemek için daha kısa
     allowed_commands: List[str] = []  # Kısıtlama uygulanmayacak, LLM her şeyi çalıştırabilir.
 
     async def _run(self, params: Dict[str, Any]) -> ToolResult:
