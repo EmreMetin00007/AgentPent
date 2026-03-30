@@ -88,3 +88,34 @@ async def test_httpx_fallback_marks_proxy_like_responses():
     assert result.success is True
     assert result.parsed_data["results"][0]["status_code"] == 407
     assert result.parsed_data["results"][0]["looks_like_proxy"] is True
+
+
+@pytest.mark.asyncio
+@patch("tools.base_tool.scope_guard")
+async def test_httpx_execute_accepts_target_lists(mock_scope):
+    tool = HttpxTool()
+    tool.run_command = AsyncMock(return_value=ToolResult(
+        tool_name="httpx",
+        success=False,
+        stderr="cli unavailable",
+    ))
+    mock_scope.validate_target = MagicMock(return_value=True)
+
+    def _fake_urlopen(request, timeout=0, context=None):
+        if request.full_url == "http://10.10.10.5:8080":
+            return _response_context(
+                200,
+                "<html><title>Alive</title></html>",
+                {"Content-Type": "text/html"},
+            )
+        raise urllib.error.URLError("connection refused")
+
+    with patch("tools.httpx_tool.urllib.request.urlopen", side_effect=_fake_urlopen):
+        result = await tool.execute({
+            "target": ["http://10.10.10.5:8080", "http://10.10.10.5:3128"],
+            "timeout": 1,
+        })
+
+    assert result.success is True
+    assert mock_scope.validate_target.call_count == 2
+    assert result.parsed_data["results"][0]["title"] == "Alive"

@@ -109,6 +109,19 @@ class BaseTool(ABC):
         """Hedefin kapsamda olduğunu doğrula. Kapsam dışıysa exception fırlatır."""
         return scope_guard.validate_target(target, port)
 
+    @staticmethod
+    def _normalize_targets(target: Any) -> List[str]:
+        if isinstance(target, (list, tuple, set)):
+            normalized: List[str] = []
+            for item in target:
+                text = str(item).strip()
+                if text:
+                    normalized.append(text)
+            return normalized
+
+        text = str(target).strip() if target is not None else ""
+        return [text] if text else []
+
     # ── Komut Çalıştırma ─────────────────────────────────
 
     async def run_command(
@@ -169,12 +182,17 @@ class BaseTool(ABC):
     async def execute(self, params: Dict[str, Any]) -> ToolResult:
         """Scope guard + rate limiter + audit'ten geçir ve aracı çalıştır."""
         target = params.get("target", "")
+        normalized_targets = self._normalize_targets(target)
         port = params.get("port")
         start = time.monotonic()
 
         # 1. Kapsam kontrolü
         try:
-            self.validate_scope(target, port)
+            if normalized_targets:
+                for single_target in normalized_targets:
+                    self.validate_scope(single_target, port)
+            else:
+                self.validate_scope("", port)
         except OutOfScopeError as exc:
             logger.warning("[%s] Kapsam ihlali: %s", self.name, exc)
             return ToolResult(
@@ -192,7 +210,8 @@ class BaseTool(ABC):
             )
 
         # 3. Rate limiter — target bazlı throttle + jitter
-        await rate_limiter.acquire(target or "global")
+        rate_limit_key = normalized_targets[0] if normalized_targets else "global"
+        await rate_limiter.acquire(rate_limit_key)
 
         try:
             result = await self._run(params)
