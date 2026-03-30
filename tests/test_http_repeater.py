@@ -64,3 +64,30 @@ async def test_http_repeater_post():
     assert result.success is True
     assert "HTTP/1.1 405" in result.stdout
     assert result.parsed_data["status"] == 405
+
+
+@pytest.mark.asyncio
+async def test_http_repeater_detects_proxy_like_response():
+    tool = HttpRepeaterTool()
+
+    error = urllib.error.HTTPError(
+        url="http://example.com:3128/",
+        code=407,
+        msg="Proxy Authentication Required",
+        hdrs={"Proxy-Agent": "Squid", "Content-Type": "text/html"},
+        fp=io.BytesIO(b"Proxy Authentication Required"),
+    )
+
+    with patch(
+        "tools.http_repeater_tool.urllib.request.urlopen",
+        side_effect=error,
+    ):
+        result = await tool._run({
+            "url": "http://example.com:3128/",
+            "method": "GET",
+        })
+
+    assert result.success is True
+    assert result.parsed_data["status"] == 407
+    assert result.parsed_data["looks_like_proxy"] is True
+    assert result.parsed_data["looks_like_html"] is True

@@ -42,6 +42,8 @@ HTML yanıtından tüm `<form>`, `<a href>`, `<input>` elementlerini ve parametr
 
 **Ağır araç kuralı:** `sqlmap`, `ffuf` ve `nikto` çalıştırmadan önce mutlaka `http_repeater` veya `browser_vision` ile pozitif kanıt topla. Aynı iterasyonda bu ağır araçlardan en fazla bir tanesini çalıştır.
 
+**Proxy-benzeri port kuralı:** `3128` ve bazı `8080` servisleri uygulama değil forward proxy olabilir. `http_repeater` sonucunda `407`, `Via`, `Proxy-Agent`, `Squid`, `Proxy Authentication Required` veya benzeri proxy işaretleri görürsen bu portta `sqlmap`, `ffuf`, `nikto` ve `xsstrike` çalıştırma. Önce bunu INFO seviyesinde proxy/intermediary servisi olarak kaydet.
+
 ### Adım 2: Dizin/Dosya Keşfi (ffuf)
 Sadece canlı web servisi ve ilgili path kanıtı varsa dizin keşfine geç. FUZZ kelimesini URL'de placeholder olarak kullan.
 
@@ -176,6 +178,6 @@ Eğer denemelerin 403 Forbidden veya WAF bloklamaları veriyorsa:
 
 1. **Araç çıktısı olmadan bulgu UYDURMA** — Her bulgu, bir araçtan gelen stdout kanıtına dayanmalı
 2. **Parametre bulamazsan keşfe devam et** — ffuf ile farklı wordlist'ler dene, browser_vision ile formlara bak
-3. **Birden fazla port açıksa HEPSİNİ test et** — 80, 443, 8080, 8443 gibi web portlarını ayrı ayrı tara
+3. **Birden fazla port açıksa doğrulanan web portlarını ayrı ayrı tara** — 80, 443, 8080, 8443 gibi portlarda önce uygulama mı proxy mi olduğunu doğrula
 4. **HEDEF_IP yerine gerçek hedef IP'sini kullan** — Context'teki Mission Bilgileri'nden al
 5. **Ağır araçları zincirleme çalıştırma** — aynı iterasyonda yalnızca bir ağır aktif araç (`sqlmap`, `ffuf`, `nikto`) kullan

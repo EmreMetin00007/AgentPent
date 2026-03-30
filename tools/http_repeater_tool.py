@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import urllib.request
 import urllib.error
 from typing import Any, ClassVar, Dict
@@ -16,6 +17,29 @@ from typing import Any, ClassVar, Dict
 from tools.base_tool import BaseTool, ToolResult
 
 logger = logging.getLogger("agentpent.tools.http_repeater")
+
+
+def _extract_html_title(body: str) -> str:
+    match = re.search(r"<title[^>]*>(.*?)</title>", body, re.IGNORECASE | re.DOTALL)
+    if not match:
+        return ""
+    return re.sub(r"\s+", " ", match.group(1)).strip()[:200]
+
+
+def _looks_like_proxy(status: int, headers: Dict[str, str], body: str) -> bool:
+    header_keys = {key.lower(): value for key, value in headers.items()}
+    body_lower = body.lower()
+    indicators = [
+        status == 407,
+        "proxy-agent" in header_keys,
+        "via" in header_keys,
+        "forwarded" in header_keys,
+        "proxy authentication required" in body_lower,
+        "this is a proxy server" in body_lower,
+        "squid" in body_lower,
+        "proxy error" in body_lower,
+    ]
+    return any(indicators)
 
 
 class HttpRepeaterTool(BaseTool):
@@ -82,12 +106,22 @@ class HttpRepeaterTool(BaseTool):
         output_lines.append(body if len(body) < 15000 else body[:15000] + "\n...[TRUNCATED_BODY]")
 
         out_str = "\n".join(output_lines)
+        content_type = resp_headers.get("Content-Type", "")
+        looks_like_proxy = _looks_like_proxy(status, resp_headers, body)
         return ToolResult(
             tool_name=self.name,
             command=f"{method} {url}",
             success=True,
             stdout=out_str,
-            parsed_data={"status": status, "headers": resp_headers, "body_length": len(body)}
+            parsed_data={
+                "status": status,
+                "headers": resp_headers,
+                "body_length": len(body),
+                "content_type": content_type,
+                "title": _extract_html_title(body),
+                "looks_like_html": "html" in content_type.lower() or "<html" in body.lower(),
+                "looks_like_proxy": looks_like_proxy,
+            }
         )
 
     def parse_output(self, raw: str) -> Dict[str, Any]:
